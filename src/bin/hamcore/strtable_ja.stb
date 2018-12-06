@@ -1109,9 +1109,9 @@ SVC_VPNBRIDGE_DESCRIPT	SoftEther VPN Bridge プロセスを管理します。Sof
 
 
 # サービス定義 (SoftEther VPN Client)
-SVC_SEVPNCLIENTDEV_NAME		sevpnclient
-SVC_SEVPNCLIENTDEV_TITLE		SoftEther VPN Client Developer Edition
-SVC_SEVPNCLIENTDEV_DESCRIPT	SoftEther VPN Client の仮想 LAN カードデバイスドライバおよび接続サービスを管理します。このサービスが停止された場合は、このコンピュータの SoftEther VPN Client を使用して SoftEther VPN Server に接続することができなくなります。
+SVC_SEVPNCLIENT_NAME		sevpnclient
+SVC_SEVPNCLIENT_TITLE		SoftEther VPN Client Developer Edition
+SVC_SEVPNCLIENT_DESCRIPT	SoftEther VPN Client の仮想 LAN カードデバイスドライバおよび接続サービスを管理します。このサービスが停止された場合は、このコンピュータの SoftEther VPN Client を使用して SoftEther VPN Server に接続することができなくなります。
 
 
 # サービス定義 (SoftEther VPN Server)

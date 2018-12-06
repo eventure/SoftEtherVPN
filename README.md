@@ -52,7 +52,7 @@ SoftEther VPN supports most of widely-used VPN protocols
 including SSL-VPN, OpenVPN, IPsec, L2TP, MS-SSTP, L2TPv3 and EtherIP
 by the single SoftEther VPN Server program.
 
-More details on http://www.softether.org/.
+More details on http://www.softether.org/
 
 
 # BOARD MEMBERS OF THIS REPOSITORY

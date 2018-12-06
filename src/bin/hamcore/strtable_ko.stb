@@ -7290,7 +7290,7 @@ SW_LINK_NAME_DEBUG_COMMENT SoftEther VPN 디버깅 정보를 수집합니다. �
 HUB_AO_DenyAllRadiusLoginWithNoVlanAssign	If you set this option to non-zero value, then all users, which RADIUS server returns no "Tunnel-Pvt-Group-ID" (ID = 81) value, will be denied to connect to the Virtual Hub. (Only if the values of AssignVLanIdByRadiusAttribute is non-zero value.)
 HUB_AO_UseHubNameAsDhcpUserClassOption		If you set this option to non-zero value, then the Virtual Hub Name will be added to a DHCP request to an external DHCP server as the "User-Class" option. This allows to use separate pools of IP addresses for each Virtual Hub. (For only L2TP/IPsec and OpenVPN sessions.)
 CM_VLAN_REINSTALL_MSG	After reinstalling the Virtual Network Adapter driver, the current Virtual Network Adapter's MAC address will change. Also, all TCP/IP settings within the Virtual Network Adapter will reset.\r\n\r\nIn case the reinstalled Virtual Network Adapter fails to work, delete it and create a new one. If it still doesn't work properly, please create a new Virtual Network Adapter with a different name.
-SVC_SEVPNCLIENTDEV_NAME		sevpnclientdev
+SVC_SEVPNCLIENTDEV_NAME		sevpnclient
 SVC_SEVPNCLIENTDEV_TITLE	SoftEther VPN Client Developer Edition
 SVC_SEVPNCLIENTDEV_DESCRIPT	This manages the Virtual Network Adapter device driver and connection service for the SoftEther VPN Client. When this service is stopped, it will not be possible to use SoftEther VPN Client on this computer to connect to a SoftEther VPN Server.
 SVC_SEVPNSERVERDEV_NAME		sevpnserverdev

@@ -1116,7 +1116,7 @@ SVC_VPNBRIDGE_DESCRIPT		它管理 SoftEther VPN Bridge 服务进程。SoftEther 
 
 
 # 服务定义 (SoftEther VPN Client)
-SVC_SEVPNCLIENTDEV_NAME			sevpnclientdev
+SVC_SEVPNCLIENTDEV_NAME			sevpnclient
 SVC_SEVPNCLIENTDEV_TITLE			SoftEther VPN Client Developer Edition
 SVC_SEVPNCLIENTDEV_DESCRIPT		它为 SoftEther VPN Client 管理虚拟网络适配器设备驱动和连接服务。当服务停止时，此计算机将无法使用 SoftEther VPN Client 连接到 SoftEther VPN Server。
 

@@ -1,6 +1,6 @@
 # SoftEther VPN
 
-[![AppVeyor build status](https://ci.appveyor.com/api/projects/status/github/mogikanin/softethervpn?branch=hide&svg=true)](https://ci.appveyor.com/project/mogikanin/softethervpn) 
+[![AppVeyor build status](https://ci.appveyor.com/api/projects/status/ebm53bc2wvqg9j1p?svg=true)](https://ci.appveyor.com/project/mogikanin/softethervpn) 
 
 - [SoftEther VPN](#softether-vpn)
 - [BOARD MEMBERS OF THIS REPOSITORY](#board-members-of-this-repository)

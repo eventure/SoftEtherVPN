@@ -1,7 +1,8 @@
 # SoftEther VPN String Table
-# Copyright (c) SoftEther VPN Project. All Rights Reserved.
+# Copyright (c) all contributors on SoftEther VPN project in GitHub.
+# Copyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.
 #
-# http://www.softether.co.jp/
+# https://www.softether.org/
 
 
 ###########################################################################
@@ -157,11 +158,11 @@ ERR_91					Unable to disconnect the Virtual Layer 3 Switch session. To delete th
 ERR_92					A Virtual Layer 3 Switch with the specified name already exists. Specify a different name.
 ERR_93					Specified Virtual Layer 3 Switch not found.
 ERR_94					The specified name is invalid. Check if the name contains characters that cannot be used.
-ERR_95					Failed to add the Virtual Layer 3 interface.
-ERR_96					Failed to delete the Virtual Layer 3 interface.
+ERR_95					Failed to add the Virtual Layer 3 interface. Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting interfaces are unable when the Virtual Layer 3 switch is running.
+ERR_96					Failed to delete the Virtual Layer 3 interface. Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting interfaces are unable when the Virtual Layer 3 switch is running.
 ERR_97					The Virtual Layer 3 interface that is connecting to the destination Virtual Hub of the specified Virtual Layer 3 interface already exists in the Virtual Layer 3 Switch. No more than one Virtual Layer 3 interface that connects to the same Virtual Hub can be defined in a Virtual Layer 3 Switch.
-ERR_98					Failed to add routing table entry.
-ERR_99					Failed to delete routing table entry.
+ERR_98					Failed to add routing table entry. Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting routing table entries are unable when the Virtual Layer 3 switch is running.
+ERR_99					Failed to delete routing table entry. Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting routing table entries are unable when the Virtual Layer 3 switch is running.
 ERR_100					The specified routing table entry already exists.
 ERR_101					The client clock and the server clock are not synchronized with each other. Check the time settings.
 ERR_102					Unable to start this Virtual Layer 3 Switch. \r\n\r\nTo start the Virtual Layer 3 Switch, at least 1 virtual interface must be defined in the Virtual Layer 3 Switch.
@@ -1075,7 +1076,7 @@ SVC_HIDE_TRAY_MSG		This will hide the tasktray icons when starting %S in user mo
 
 
 # Concerning services (UNIX)
-UNIX_SVC_HELP			%S service program\nCopyright (c) SoftEther VPN Project. All Rights Reserved.\n\n%S command usage:\n %S start  - Start the %S service.\n %S stop   - Stop the %S service if the service has been already started.\n\n
+UNIX_SVC_HELP			%S service program\nCopyright (c) all contributors on SoftEther VPN project in GitHub.\nCopyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.\nAll Rights Reserved.\n\n%S command usage:\n %S start  - Start the %S service.\n %S stop   - Stop the %S service if the service has been already started.\n\n
 UNIX_SVC_STARTED		The %S service has been started.\n
 UNIX_SVC_STOPPING		Stopping the %S service ...\n
 UNIX_SVC_STOPPED		%S service has been stopped.\n
@@ -1787,6 +1788,9 @@ LS_LICENSE_NOT_VPNSERVER	Connection "%S": License error occurred. The VPN Client
 LS_LICENSE_NOT_VPNCLUSTER	Connection "%S": License error occurred. The license registered on this VPN Server is of a type that prevents the use of the current clustering function and a VPN Client has attempted connection while operating in Cluster mode. You must restart the VPN Server.
 LS_LICENSE_VIOLATION		Connection "%S": A license violation has occurred on the VPN Server and connections are not being received.
 LS_LICENSE_VIOLATION_DETECTED	A license violation has been detected. A different VPN Server is operating with the same server ID "%I64u" as this VPN Server. It is possible that there are two or more VPN Servers in the cluster that are using the same license. Check the license information of each VPN Server.
+LS_API_AUTH_OK			HTTPS API client "%r:%u" (%S): Administration mode: "%S": The embedded HTTPS web server accepted the successful login. Username: "%S", Method: "%S", Path: "%S"
+LS_API_AUTH_ERROR		HTTPS API client "%r:%u" (%S): The embedded HTTPS web server refused a login attempt. Username: "%S", Method: "%S", Path: "%S"
+LS_API_RPC_CALL			HTTPS API client "%r:%u" (%S): The client called a JSON-API. Method: "%S", Returned error code: %u (0 = success), Returned error message: "%s"
 
 
 # (OpenVPN Logs)
@@ -2447,7 +2451,7 @@ STATIC7					&Keep Alive Internet Connection Function:
 
 PREFIX					D_ABOUT
 S_INFO1					SoftEther VPN %u.0 Developer Edition (Ver %u.%02u, Build %u)
-S_INFO2				Open-Source VPN Software for Academic Purpose, under the GPLv2 License.\r\nCopyright (c) 2012-%u SoftEther Project at University of Tsukuba, Japan. All Rights Reserved.\r\nWeb Site: http://www.softether.org/\r\n%S
+S_INFO2				Licensed under the Apache License, Version 2.0.\r\nCopyright (c) 2012-%u all contributors on SoftEther VPN project in GitHub. All Rights Reserved.\r\nWeb Site: http://www.softether.org/\r\n%S
 S_INFO3					This product includes the following software components:\r\nBitVisor: Copyright (c) 2007, 2008 University of Tsukuba. Copyright (C) 2007, 2008 National Institute of Information and Communications Technology. All rights reserved. / Microsoft(R) C Runtime Library: (c) 2007 Microsoft Corporation. All Rights Reserved. / PKCS #11 Cryptographic Token Interface (Cryptoki): Copyright (c) RSA Security Inc. / WinPcap: Copyright (c) 2001 - 2003 NetGroup, Politecnico di Torino (Italy). All rights reserved. / libedit: Copyright (c) 1992, 1993 The Regents of the University of California. All rights reserved. / libiconv: Copyright (C) 2007 Free Software Foundation, Inc. / ncurses: Copyright (c) 1998-2005, 2006 Free Software Foundation, Inc. / OpenSSL: Copyright (c) 1998-2011 The OpenSSL Project. All rights reserved. This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (http://www.openssl.org/). This product includes cryptographic software written by Eric Young (eay@cryptsoft.com). / zlib: (C) 1995-2004 Jean-loup Gailly and Mark Adler. / Special Thanks to: Software Laboratory, Academic Computing Communication Center, Industrial Liaison and Cooperative Research Center and Professor Yasushi Shinjo in University of Tsukuba, Japan.
 S_INFO4				THIS SOFTWARE IS FREEWARE DEVELOPED UNDER THE SOFTETHER VPN PROJECT AT UNIVERSITY OF TSUKUBA, WITHOUT WARRANTY OF AND KIND. IN NO EVENT SHALL THE DEVELOPERS, COPYRIGHT OWNERS OR DISTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY IN ANY WAY OUT OF THE USE OF THIS SOFTWARE.\r\n\r\nSoftEther VPN is a work of the research and development project of Japanese Government, subsidized by Ministry of Economy, Trade and Industry of Japan, administrated by Information Promotion Agency.
 IDCANCEL				&OK
@@ -4457,12 +4461,12 @@ CMD_VPNCMD_CMD			If the optional command 'commands...' is included after /CMD, t
 CMD_VPNCMD_CSV			You can specify this option to enable CSV outputs. Results of each command will be printed in the CSV format. It is useful for processing the results by other programs.
 CMD_VPNCMD_CS_1			By using vpncmd program, the following can be achieved. \n\n1. Management of VPN Server or VPN Bridge \n2. Management of VPN Client\n3. Use of VPN Tools (certificate creation and Network Traffic Speed Test Tool)\n\n
 CMD_VPNCMD_CS_2			Select 1, 2 or 3: 
-CMD_VPNCMD_HOST_1		Specify the host name or IP address of the computer that the destination VPN Server or VPN Bridge is operating on. \nBy specifying according to the format 'host name:port number', you can also specify the port number. \n(When the port number is unspecified, 443 is used.)\nIf nothing is input and the Enter key is pressed, the connection will be made to the port number 8888 of localhost (this computer).
+CMD_VPNCMD_HOST_1		Specify the host name or IP address of the computer that the destination VPN Server or VPN Bridge is operating on. \nBy specifying according to the format 'host name:port number', you can also specify the port number. \n(When the port number is unspecified, 443 is used.)\nIf nothing is input and the Enter key is pressed, the connection will be made to the port number 443 of localhost (this computer).
 CMD_VPNCMD_HOST_2		Specify the host name or IP address of the computer that the destination VPN Client is operating on. \nIf nothing is input and Enter is pressed, connection will be made to localhost (this computer).
 CMD_VPNCMD_HOST_3		Hostname of IP Address of Destination: 
 CMD_VPNCMD_HUB_1		If connecting to the server by Virtual Hub Admin Mode, please input the Virtual Hub name. \nIf connecting by server admin mode, please press Enter without inputting anything.
 CMD_VPNCMD_HUB_2		Specify Virtual Hub Name: 
-CMD_VPNCMD_ABOUT		SoftEther VPN Command Line Management Utility (vpncmd command)\nDeveloper Edition\n%S\n%S\nCopyright (c) SoftEther VPN Project. All Rights Reserved.\n
+CMD_VPNCMD_ABOUT		SoftEther VPN Command Line Management Utility (vpncmd command)\nDeveloper Edition\n%S\n%S\nCopyright (c) all contributors on SoftEther VPN project in GitHub.\nCopyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.\nAll rights reserved.\n
 CMD_VPNCMD_PASSWORD_1	Access has been denied. Possibly the password is incorrect, or perhaps you are connecting by an incorrect admin mode. You can try inputting the password again. To cancel, press Ctrl+D.
 CMD_VPNCMD_PASSWORD_2	Password: 
 CMD_VPNCMD_ERROR		Error occurred. (Error code: %u)\n%s
@@ -7052,7 +7056,7 @@ CMD_Check_Args			Check
 
 # Concerning System Checker
 # (This contains some strange character strings which are used to check character code conversion.)
-CHECK_TITLE				---------------------------------------------------\nSoftEther VPN Operation Environment Check Tool\nDeveloper Edition\n\nCopyright (c) SoftEther VPN Project.\nAll Rights Reserved.\n\n
+CHECK_TITLE				---------------------------------------------------\nSoftEther VPN Operation Environment Check Tool\nDeveloper Edition\n\nCopyright (c) all contributors on SoftEther VPN project in GitHub.\nCopyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.\nAll Rights Reserved.\n\n
 CHECK_NOTE				If this operation environment check tool is run on a system and that system passes, it is most likely that SoftEther VPN software can operate on that system. This check may take a while. Please wait...\n\n
 CHECK_EXEC_TAG			Checking '%s'... \n
 CHECK_PASS				Pass
@@ -7122,6 +7126,8 @@ SW_WEB2_TITLE								Specify Files
 
 SW_UNINSTALLINFO_URL						http://selinks.org/
 SW_UNINSTALLINFO_PUBLISHER					SoftEther VPN Project
+
+SW_KB3033929_REQUIRED						In Windows 7 and Windows Server 2008 R2, some SoftEther VPN functions require the Microsoft's Windows Update module KB3033929 installed.\r\n\r\nIf KB3033929 is not installed in your Windows, please install it from Windows Update or Microsoft website before installing SoftEther VPN.
 
 
 SW_COMPONENTS_ABOUT_TAG						About %s

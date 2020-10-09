@@ -1,7 +1,8 @@
 ﻿# SoftEther VPN String Table
-# Copyright (c) SoftEther VPN Project. All Rights Reserved.
+# Copyright (c) all contributors on SoftEther VPN project in GitHub.
+# Copyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.
 #
-# http://www.softether.co.jp/
+# https://www.softether.org/
 #
 # Contributors:
 # - YF (https://github.com/yfdyh000)
@@ -160,11 +161,11 @@ ERR_91					無法斷開虛擬 3 層交換機會話。要刪除會話，請停止
 ERR_92					具有指定名稱的虛擬 3 層交換機已存在。指定一個不同的名稱。
 ERR_93					找不到指定的虛擬 3 層交換機。
 ERR_94					指定的名稱無效。檢查名稱是否有不能使用的字元
-ERR_95					無法添加虛擬 3 層介面。
-ERR_96					無法刪除虛擬 3 層介面。
+ERR_95					無法添加虛擬 3 層介面。Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting interfaces are unable when the Virtual Layer 3 switch is running.
+ERR_96					無法刪除虛擬 3 層介面。Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting interfaces are unable when the Virtual Layer 3 switch is running.
 ERR_97					與指定虛擬 3 層交換介面的目標虛擬 HUB 連接的虛擬 3 層介面已在虛擬 3 層交換機中存在。不能在同一個虛擬 3 層交換機中定義超過一個連接到同一個虛擬 HUB 的虛擬 3 層介面。
-ERR_98					無法添加路由表項。
-ERR_99					無法刪除路由表項。
+ERR_98					無法添加路由表項。Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting routing table entries are unable when the Virtual Layer 3 switch is running.
+ERR_99					無法刪除路由表項。Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting routing table entries are unable when the Virtual Layer 3 switch is running.
 ERR_100					指定的路由表項已存在。
 ERR_101					用戶端和伺服器的時鐘彼此不同步。檢查時間設置。
 ERR_102					無法啟動此虛擬 3 層交換機。 要啟動虛擬 3 層交換機，必須在虛擬 3 層交換機定義至少一個虛擬介面。
@@ -454,7 +455,7 @@ WINVER_ERROR_PC_REMOTE	遠端伺服器
 
 
 # 開源版本的警告
-OSS_MSG					歡迎來到 SoftEther VPN 伺服器學術版 !\r\n\r\n此 VPN 伺服器作為日本筑波大學的一個學術研究由免費軟體發展的，且由，開源 (GPL) SoftEther 項目 (http://www.softether.org/) 為公眾利益免費發佈的。\r\n\r\nSoftEther VPN 軟體是作為筑波大學和 SoftEther 公司之間的聯合研究合同的一部分而發佈給公眾的。SoftEther VPN 軟體的開發和發佈僅為學術研究目的。因此，對 SoftEther VPN 軟體不提供支援服務，即使它包含錯誤或漏洞。用戶將對使用 SoftEther VPN 的結果承擔責任。 SoftEther VPN 的開發者和發行者都將永遠不會為任何後果或損失承擔責任。\r\n\r\n在您同意上述啟示後，使用 SoftEther VPN 伺服器享受 VPN 通信。\r\n\r\n對於 SoftEther VPN 的更多細節，請參閱 http://www.softether.org/。\r\n\r\n
+OSS_MSG					歡迎來到 SoftEther VPN 伺服器學術版 !\r\n\r\n此 VPN 伺服器作為日本筑波大學的一個學術研究由免費軟體發展的，且由，開源 SoftEther 項目 (http://www.softether.org/) 為公眾利益免費發佈的。\r\n\r\nSoftEther VPN 軟體是作為筑波大學和 SoftEther 公司之間的聯合研究合同的一部分而發佈給公眾的。SoftEther VPN 軟體的開發和發佈僅為學術研究目的。因此，對 SoftEther VPN 軟體不提供支援服務，即使它包含錯誤或漏洞。用戶將對使用 SoftEther VPN 的結果承擔責任。 SoftEther VPN 的開發者和發行者都將永遠不會為任何後果或損失承擔責任。\r\n\r\n在您同意上述啟示後，使用 SoftEther VPN 伺服器享受 VPN 通信。\r\n\r\n對於 SoftEther VPN 的更多細節，請參閱 http://www.softether.org/。\r\n\r\n
 
 
 # NAT Traversal warning
@@ -1088,7 +1089,7 @@ SVC_HIDE_TRAY_MSG		啟動 %S 使用者模式時將隱藏工作列圖示。\r\n�
 
 
 #關於服務 (UNIX)
-UNIX_SVC_HELP			%S service program\nCopyright (c) SoftEther VPN Project. All Rights Reserved.\n\n%S command usage:\n %S start  - Start the %S service.\n %S stop   - Stop the %S service if the service has been already started.\n\n
+UNIX_SVC_HELP			%S service program\nCopyright (c) all contributors on SoftEther VPN project in GitHub.\nCopyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.\nAll Rights Reserved.\n\n%S command usage:\n %S start  - Start the %S service.\n %S stop   - Stop the %S service if the service has been already started.\n\n
 UNIX_SVC_STARTED		The %S service has been started.\n
 UNIX_SVC_STOPPING		Stopping the %S service ...\n
 UNIX_SVC_STOPPED		%S service has been stopped.\n
@@ -1807,6 +1808,9 @@ LS_LICENSE_NOT_VPNSERVER	連接 "%S": 許可證錯誤。VPN Client 嘗試連接�
 LS_LICENSE_NOT_VPNCLUSTER	連接 "%S": 許可證錯誤。此 VPN Server 上註冊的許可證是禁止使用當前群集功能的類型，且一個 VPN Client 已嘗試在群集模式下連接。您必須重啟 VPN Server。
 LS_LICENSE_VIOLATION		連接 "%S": VPN Server 發生違反許可證錯誤，不接受連接。
 LS_LICENSE_VIOLATION_DETECTED	發現許可證違反錯誤，一個不同的 VPN Server 與此服務端具有相同的服務端ID "%I64u"。可能是在群集中有兩個或以上 VPN Server 正在使用相同的許可證。請檢查每一個 VPN Server 的許可證資訊。
+LS_API_AUTH_OK			HTTPS API client "%r:%u" (%S): Administration mode: "%S": The embedded HTTPS web server accepted the successful login. Username: "%S", Method: "%S", Path: "%S"
+LS_API_AUTH_ERROR		HTTPS API client "%r:%u" (%S): The embedded HTTPS web server refused a login attempt. Username: "%S", Method: "%S", Path: "%S"
+LS_API_RPC_CALL			HTTPS API client "%r:%u" (%S): The client called a JSON-API. Method: "%S", Returned error code: %u (0 = success), Returned error message: "%s"
 
 
 # (OpenVPN Logs)
@@ -2468,7 +2472,7 @@ STATIC7					保持網際網路連接功能(&K)
 
 PREFIX					D_ABOUT
 S_INFO1					SoftEther VPN %u.0 Developer Edition (Ver %u.%02u, Build %u)
-S_INFO2					Open-Source VPN Software for Academic Purpose, under the GPLv2 License.\r\nCopyright (c) 2012-%u SoftEther Project at University of Tsukuba, Japan. All Rights Reserved.\r\nWeb Site: http://www.softether.org/\r\n%S
+S_INFO2				Licensed under the Apache License, Version 2.0.\r\nCopyright (c) 2012-%u all contributors on SoftEther VPN project in GitHub. All Rights Reserved.\r\nWeb Site: http://www.softether.org/\r\n%S
 S_INFO3					This product includes the following software components:\r\nBitVisor: Copyright (c) 2007, 2008 University of Tsukuba. Copyright (C) 2007, 2008 National Institute of Information and Communications Technology. All rights reserved. / Microsoft(R) C Runtime Library: (c) 2007 Microsoft Corporation. All Rights Reserved. / PKCS #11 Cryptographic Token Interface (Cryptoki): Copyright (c) RSA Security Inc. / WinPcap: Copyright (c) 2001 - 2003 NetGroup, Politecnico di Torino (Italy). All rights reserved. / libedit: Copyright (c) 1992, 1993 The Regents of the University of California. All rights reserved. / libiconv: Copyright (C) 2007 Free Software Foundation, Inc. / ncurses: Copyright (c) 1998-2005, 2006 Free Software Foundation, Inc. / OpenSSL: Copyright (c) 1998-2011 The OpenSSL Project. All rights reserved. This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (http://www.openssl.org/). This product includes cryptographic software written by Eric Young (eay@cryptsoft.com). / zlib: (C) 1995-2004 Jean-loup Gailly and Mark Adler. / Special Thanks to: Software Laboratory, Academic Computing Communication Center, Industrial Liaison and Cooperative Research Center and Professor Yasushi Shinjo in University of Tsukuba, Japan.
 S_INFO4					此 VPN 伺服器作為的一個學術研究且由 (http://www.softether.org/) 為公眾利益免費發佈的。本軟體是日本筑波大學 SoftEther 專案下開發的免費軟體，無任何擔保。開發人員、版權所有者或分銷商在任何情況下對於使用本軟體的任何索賠、損害賠償或其他情況不承擔責任。\r\n\r\nSoftEther VPN 是日本政府的研究和開發項目的一項工作，由日本的經濟、貿易和工業部資助，由資訊化推進機構管理。
 IDCANCEL				確定(&O)
@@ -4479,7 +4483,7 @@ CMD_VPNCMD_HOST_2			指定的主機名稱或正在運行的目標 VPN Client 電
 CMD_VPNCMD_HOST_3			目標 IP 位址的主機名稱:
 CMD_VPNCMD_HUB_1			如果通過虛擬 HUB 管理模式連接到伺服器，請輸入虛擬 HUB 的名稱。\n如果通過伺服器管理模式連接，無須輸入任何內容請按Backspace鍵。\n
 CMD_VPNCMD_HUB_2			指定虛擬 HUB 名稱:
-CMD_VPNCMD_ABOUT			SoftEther VPN 命令列管理工具 (vpncmd 命令)\nDeveloper Edition\n%S\n%S\nCopyright (c) SoftEther VPN Project. All Rights Reserved.\n
+CMD_VPNCMD_ABOUT			SoftEther VPN 命令列管理工具 (vpncmd 命令)\nDeveloper Edition\n%S\n%S\nCopyright (c) all contributors on SoftEther VPN project in GitHub.\nCopyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.\nAll rights reserved.\n
 CMD_VPNCMD_PASSWORD_1		訪問被拒絕。可能是密碼不正確，或者是您以不正確的管理模式連接。您可以嘗試再次輸入密碼。要取消，請按 Ctrl + D。
 CMD_VPNCMD_PASSWORD_2		密碼: 
 CMD_VPNCMD_ERROR			發生錯誤。(錯誤代碼: %u)\n%s
@@ -7096,7 +7100,7 @@ CMD_Check_Args				Check
 
 # 關於系統 checker
 # (包含著一部分奇怪的字串,不過，是檢測字元編碼變換用的)
-CHECK_TITLE					---------------------------------------------------\nSoftEther VPN 運行環境檢查工具\nDeveloper Edition\n\nCopyright (c) SoftEther VPN Project.\nAll Rights Reserved.\n\n
+CHECK_TITLE					---------------------------------------------------\nSoftEther VPN 運行環境檢查工具\nDeveloper Edition\n\nCopyright (c) all contributors on SoftEther VPN project in GitHub.\nCopyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.\nAll Rights Reserved.\n\n
 CHECK_NOTE					如果運行了此運行環境檢測工具的系統通過了測試，SoftEther VPN 軟體有較高的運行可能性。檢測可能需要一定的時間。請稍候...\n\n
 CHECK_EXEC_TAG				'%s' 的檢測中...\n
 CHECK_PASS					[合格] ○
@@ -7161,6 +7165,7 @@ SW_WEB2_TITLE						指定資料夾
 SW_UNINSTALLINFO_URL					http://selinks.org/
 SW_UNINSTALLINFO_PUBLISHER				SoftEther VPN Project
 
+SW_KB3033929_REQUIRED						In Windows 7 and Windows Server 2008 R2, some SoftEther VPN functions require the Microsoft's Windows Update module KB3033929 installed.\r\n\r\nIf KB3033929 is not installed in your Windows, please install it from Windows Update or Microsoft website before installing SoftEther VPN.
 
 SW_COMPONENTS_ABOUT_TAG				關於 %s
 SW_COMPONENTS_REQUIRE_ADMIN			安裝需要管理員許可權

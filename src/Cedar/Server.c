@@ -1,111 +1,5 @@
 // SoftEther VPN Source Code - Developer Edition Master Branch
 // Cedar Communication Module
-// 
-// SoftEther VPN Server, Client and Bridge are free software under GPLv2.
-// 
-// Copyright (c) Daiyuu Nobori.
-// Copyright (c) SoftEther VPN Project, University of Tsukuba, Japan.
-// Copyright (c) SoftEther Corporation.
-// 
-// All Rights Reserved.
-// 
-// http://www.softether.org/
-// 
-// Author: Daiyuu Nobori, Ph.D.
-// Comments: Tetsuo Sugiyama, Ph.D.
-// 
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// version 2 as published by the Free Software Foundation.
-// 
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-// 
-// You should have received a copy of the GNU General Public License version 2
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-// SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-// 
-// THE LICENSE AGREEMENT IS ATTACHED ON THE SOURCE-CODE PACKAGE
-// AS "LICENSE.TXT" FILE. READ THE TEXT FILE IN ADVANCE TO USE THE SOFTWARE.
-// 
-// 
-// THIS SOFTWARE IS DEVELOPED IN JAPAN, AND DISTRIBUTED FROM JAPAN,
-// UNDER JAPANESE LAWS. YOU MUST AGREE IN ADVANCE TO USE, COPY, MODIFY,
-// MERGE, PUBLISH, DISTRIBUTE, SUBLICENSE, AND/OR SELL COPIES OF THIS
-// SOFTWARE, THAT ANY JURIDICAL DISPUTES WHICH ARE CONCERNED TO THIS
-// SOFTWARE OR ITS CONTENTS, AGAINST US (SOFTETHER PROJECT, SOFTETHER
-// CORPORATION, DAIYUU NOBORI OR OTHER SUPPLIERS), OR ANY JURIDICAL
-// DISPUTES AGAINST US WHICH ARE CAUSED BY ANY KIND OF USING, COPYING,
-// MODIFYING, MERGING, PUBLISHING, DISTRIBUTING, SUBLICENSING, AND/OR
-// SELLING COPIES OF THIS SOFTWARE SHALL BE REGARDED AS BE CONSTRUED AND
-// CONTROLLED BY JAPANESE LAWS, AND YOU MUST FURTHER CONSENT TO
-// EXCLUSIVE JURISDICTION AND VENUE IN THE COURTS SITTING IN TOKYO,
-// JAPAN. YOU MUST WAIVE ALL DEFENSES OF LACK OF PERSONAL JURISDICTION
-// AND FORUM NON CONVENIENS. PROCESS MAY BE SERVED ON EITHER PARTY IN
-// THE MANNER AUTHORIZED BY APPLICABLE LAW OR COURT RULE.
-// 
-// USE ONLY IN JAPAN. DO NOT USE THIS SOFTWARE IN ANOTHER COUNTRY UNLESS
-// YOU HAVE A CONFIRMATION THAT THIS SOFTWARE DOES NOT VIOLATE ANY
-// CRIMINAL LAWS OR CIVIL RIGHTS IN THAT PARTICULAR COUNTRY. USING THIS
-// SOFTWARE IN OTHER COUNTRIES IS COMPLETELY AT YOUR OWN RISK. THE
-// SOFTETHER VPN PROJECT HAS DEVELOPED AND DISTRIBUTED THIS SOFTWARE TO
-// COMPLY ONLY WITH THE JAPANESE LAWS AND EXISTING CIVIL RIGHTS INCLUDING
-// PATENTS WHICH ARE SUBJECTS APPLY IN JAPAN. OTHER COUNTRIES' LAWS OR
-// CIVIL RIGHTS ARE NONE OF OUR CONCERNS NOR RESPONSIBILITIES. WE HAVE
-// NEVER INVESTIGATED ANY CRIMINAL REGULATIONS, CIVIL LAWS OR
-// INTELLECTUAL PROPERTY RIGHTS INCLUDING PATENTS IN ANY OF OTHER 200+
-// COUNTRIES AND TERRITORIES. BY NATURE, THERE ARE 200+ REGIONS IN THE
-// WORLD, WITH DIFFERENT LAWS. IT IS IMPOSSIBLE TO VERIFY EVERY
-// COUNTRIES' LAWS, REGULATIONS AND CIVIL RIGHTS TO MAKE THE SOFTWARE
-// COMPLY WITH ALL COUNTRIES' LAWS BY THE PROJECT. EVEN IF YOU WILL BE
-// SUED BY A PRIVATE ENTITY OR BE DAMAGED BY A PUBLIC SERVANT IN YOUR
-// COUNTRY, THE DEVELOPERS OF THIS SOFTWARE WILL NEVER BE LIABLE TO
-// RECOVER OR COMPENSATE SUCH DAMAGES, CRIMINAL OR CIVIL
-// RESPONSIBILITIES. NOTE THAT THIS LINE IS NOT LICENSE RESTRICTION BUT
-// JUST A STATEMENT FOR WARNING AND DISCLAIMER.
-// 
-// 
-// SOURCE CODE CONTRIBUTION
-// ------------------------
-// 
-// Your contribution to SoftEther VPN Project is much appreciated.
-// Please send patches to us through GitHub.
-// Read the SoftEther VPN Patch Acceptance Policy in advance:
-// http://www.softether.org/5-download/src/9.patch
-// 
-// 
-// DEAR SECURITY EXPERTS
-// ---------------------
-// 
-// If you find a bug or a security vulnerability please kindly inform us
-// about the problem immediately so that we can fix the security problem
-// to protect a lot of users around the world as soon as possible.
-// 
-// Our e-mail address for security reports is:
-// softether-vpn-security [at] softether.org
-// 
-// Please note that the above e-mail address is not a technical support
-// inquiry address. If you need technical assistance, please visit
-// http://www.softether.org/ and ask your question on the users forum.
-// 
-// Thank you for your cooperation.
-// 
-// 
-// NO MEMORY OR RESOURCE LEAKS
-// ---------------------------
-// 
-// The memory-leaks and resource-leaks verification under the stress
-// test has been passed before release this source code.
 
 
 // Server.c
@@ -115,12 +9,12 @@
 
 static SERVER *server = NULL;
 static LOCK *server_lock = NULL;
-char *SERVER_CONFIG_FILE_NAME = "@vpn_server.config";
-char *SERVER_CONFIG_FILE_NAME_IN_CLIENT = "@vpn_gate_svc.config";
-char *SERVER_CONFIG_FILE_NAME_IN_CLIENT_RELAY = "@vpn_gate_relay.config";
-char *BRIDGE_CONFIG_FILE_NAME = "@vpn_bridge.config";
-char *SERVER_CONFIG_TEMPLATE_NAME = "@vpn_server_template.config";
-char *BRIDGE_CONFIG_TEMPLATE_NAME = "@vpn_server_template.config";
+char *SERVER_CONFIG_FILE_NAME = "$vpn_server.config";
+char *SERVER_CONFIG_FILE_NAME_IN_CLIENT = "$vpn_gate_svc.config";
+char *SERVER_CONFIG_FILE_NAME_IN_CLIENT_RELAY = "$vpn_gate_relay.config";
+char *BRIDGE_CONFIG_FILE_NAME = "$vpn_bridge.config";
+char *SERVER_CONFIG_TEMPLATE_NAME = "$vpn_server_template.config";
+char *BRIDGE_CONFIG_TEMPLATE_NAME = "$vpn_server_template.config";
 
 static bool server_reset_setting = false;
 
@@ -1070,62 +964,80 @@ LIST *EnumLogFile(char *hubname)
 		hubname = NULL;
 	}
 
-	GetExeDir(exe_dir, sizeof(exe_dir));
+	GetLogDir(exe_dir, sizeof(exe_dir));
 
 	// Enumerate in the server_log
 	if (hubname == NULL)
 	{
-		EnumLogFileDir(o, "server_log");
+		EnumLogFileDir(o, SERVER_LOG_DIR);
 	}
 
 	// Enumerate in the packet_log
-	Format(tmp, sizeof(tmp), "%s/packet_log", exe_dir);
-	dir = EnumDir(tmp);
-	if (dir != NULL)
+	Format(tmp, sizeof(tmp), "%s/"HUB_PACKET_LOG_DIR, exe_dir);
+
+	if (hubname == NULL)
 	{
-		UINT i;
-		for (i = 0;i < dir->NumFiles;i++)
+		dir = EnumDir(tmp);
+		if (dir != NULL)
 		{
-			DIRENT *e = dir->File[i];
-
-			if (e->Folder)
+			UINT i;
+			for (i = 0;i < dir->NumFiles;i++)
 			{
-				char dir_name[MAX_PATH];
+				DIRENT *e = dir->File[i];
 
-				if (hubname == NULL || StrCmpi(hubname, e->FileName) == 0)
+				if (e->Folder)
 				{
-					Format(dir_name, sizeof(dir_name), "packet_log/%s", e->FileName);
+					char dir_name[MAX_PATH];
+					Format(dir_name, sizeof(dir_name), HUB_PACKET_LOG_DIR"/%s", e->FileName);
 					EnumLogFileDir(o, dir_name);
 				}
 			}
-		}
 
-		FreeDir(dir);
+			FreeDir(dir);
+		}
+	}
+	else
+	{
+		char dir_name[MAX_PATH];
+
+		Format(dir_name, sizeof(dir_name), HUB_PACKET_LOG_DIR"/%s", hubname);
+
+		EnumLogFileDir(o, dir_name);
 	}
 
 	// Enumerate in the security_log
-	Format(tmp, sizeof(tmp), "%s/security_log", exe_dir);
-	dir = EnumDir(tmp);
-	if (dir != NULL)
+	Format(tmp, sizeof(tmp), "%s/"HUB_SECURITY_LOG_DIR, exe_dir);
+
+	if (hubname == NULL)
 	{
-		UINT i;
-		for (i = 0;i < dir->NumFiles;i++)
+		dir = EnumDir(tmp);
+		if (dir != NULL)
 		{
-			DIRENT *e = dir->File[i];
-
-			if (e->Folder)
+			UINT i;
+			for (i = 0;i < dir->NumFiles;i++)
 			{
-				char dir_name[MAX_PATH];
+				DIRENT *e = dir->File[i];
 
-				if (hubname == NULL || StrCmpi(hubname, e->FileName) == 0)
+				if (e->Folder)
 				{
-					Format(dir_name, sizeof(dir_name), "security_log/%s", e->FileName);
+					char dir_name[MAX_PATH];
+
+					Format(dir_name, sizeof(dir_name), HUB_SECURITY_LOG_DIR"/%s", e->FileName);
+
 					EnumLogFileDir(o, dir_name);
 				}
 			}
-		}
 
-		FreeDir(dir);
+			FreeDir(dir);
+		}
+	}
+	else
+	{
+		char dir_name[MAX_PATH];
+
+		Format(dir_name, sizeof(dir_name), HUB_SECURITY_LOG_DIR"/%s", hubname);
+
+		EnumLogFileDir(o, dir_name);
 	}
 
 	return o;
@@ -1144,7 +1056,7 @@ void EnumLogFileDir(LIST *o, char *dirname)
 		return;
 	}
 
-	GetExeDir(exe_dir, sizeof(exe_dir));
+	GetLogDir(exe_dir, sizeof(exe_dir));
 	Format(dir_full_path, sizeof(dir_full_path), "%s/%s", exe_dir, dirname);
 
 	dir = EnumDir(dir_full_path);
@@ -1837,14 +1749,37 @@ void OutRpcCapsList(PACK *p, CAPSLIST *t)
 		return;
 	}
 
+	PackSetCurrentJsonGroupName(p, "CapsList");
 	for (i = 0;i < LIST_NUM(t->CapsList);i++)
 	{
 		char tmp[MAX_SIZE];
+		char ct_key[MAX_PATH];
+		wchar_t ct_description[MAX_PATH];
+		wchar_t *w;
 		CAPS *c = LIST_DATA(t->CapsList, i);
 
 		Format(tmp, sizeof(tmp), "caps_%s", c->Name);
+
+		Format(ct_key, sizeof(ct_key), "CT_%s", c->Name);
+
+		Zero(ct_description, sizeof(ct_description));
+		w = _UU(ct_key);
+		if (UniIsEmptyStr(w) == false)
+		{
+			UniStrCpy(ct_description, sizeof(ct_description), w);
+		}
+		else
+		{
+			StrToUni(ct_description, sizeof(ct_description), c->Name);
+		}
+
 		PackAddInt(p, tmp, c->Value);
+
+		PackAddStrEx(p, "CapsName", c->Name, i, LIST_NUM(t->CapsList));
+		PackAddIntEx(p, "CapsValue", c->Value, i, LIST_NUM(t->CapsList));
+		PackAddUniStrEx(p, "CapsDescrption", ct_description, i, LIST_NUM(t->CapsList));
 	}
+	PackSetCurrentJsonGroupName(p, NULL);
 }
 void FreeRpcCapsList(CAPSLIST *t)
 {
@@ -5886,6 +5821,9 @@ void SiLoadServerCfg(SERVER *s, FOLDER *f)
 		// Disable the NAT-traversal feature
 		s->DisableNatTraversal = CfgGetBool(f, "DisableNatTraversal");
 
+		// Disable IPsec's aggressive mode
+		s->DisableIPsecAggressiveMode = CfgGetBool(f, "DisableIPsecAggressiveMode");
+
 		if (s->Cedar->Bridge == false)
 		{
 			// Enable the VPN-over-ICMP
@@ -6088,7 +6026,11 @@ void SiLoadServerCfg(SERVER *s, FOLDER *f)
 		c->SslAcceptSettings.Tls_Disable1_2 = CfgGetBool(f, "Tls_Disable1_2");
 
 		s->StrictSyslogDatetimeFormat = CfgGetBool(f, "StrictSyslogDatetimeFormat");
-                // Bits of Diffie-Hellman parameters
+
+		// Disable JSON-RPC Web API
+		s->DisableJsonRpcWebApi = CfgGetBool(f, "DisableJsonRpcWebApi");
+
+		// Bits of Diffie-Hellman parameters
 		c->DhParamBits = CfgGetInt(f, "DhParamBits");
 		if (c->DhParamBits == 0)
 		{
@@ -6298,6 +6240,8 @@ void SiWriteServerCfg(FOLDER *f, SERVER *s)
 			}
 		}
 
+		CfgAddBool(f, "DisableIPsecAggressiveMode", s->DisableIPsecAggressiveMode);
+
 		CfgAddStr(f, "OpenVPNDefaultClientOption", c->OpenVPNDefaultClientOption);
 
 		CfgAddBool(f, "OpenVPNPushDummyIPv4AddressOnL2Mode", c->OpenVPNPushDummyIPv4AddressOnL2Mode);
@@ -6420,6 +6364,9 @@ void SiWriteServerCfg(FOLDER *f, SERVER *s)
 		CfgAddBool(f, "DisableSessionReconnect", GetGlobalServerFlag(GSF_DISABLE_SESSION_RECONNECT));
 
 		CfgAddBool(f, "StrictSyslogDatetimeFormat", s->StrictSyslogDatetimeFormat);
+
+		// Disable JSON-RPC Web API
+		CfgAddBool(f, "DisableJsonRpcWebApi", s->DisableJsonRpcWebApi);
 	}
 	Unlock(c->lock);
 }
@@ -7137,7 +7084,7 @@ FARM_MEMBER *SiGetNextFarmMember(SERVER *s, CONNECTION *c, HUB *h)
 				PackAddIntEx(p, "NumTcpConnections", f->NumTcpConnections, i, num);
 				PackAddIntEx(p, "NumHubs", LIST_NUM(f->HubList), i, num);
 				PackAddBoolEx(p, "Me", f->Me, i, num);
-				PackAddInt64Ex(p, "ConnectedTime", f->ConnectedTime, i, num);
+				PackAddTime64Ex(p, "ConnectedTime", f->ConnectedTime, i, num);
 				PackAddInt64Ex(p, "SystemId", f->SystemId, i, num);
 				PackAddBoolEx(p, "DoNotSelect", do_not_select, i, num);
 			}
@@ -7166,7 +7113,7 @@ FARM_MEMBER *SiGetNextFarmMember(SERVER *s, CONNECTION *c, HUB *h)
 			PackAddStr(p, "CipherName", c->CipherName);
 			PackAddStr(p, "ClientStr", c->ClientStr);
 			PackAddInt(p, "ClientVer", c->ClientVer);
-			PackAddInt64(p, "ConnectedTime", Tick64ToTime64(c->ConnectedTick));
+			PackAddTime64(p, "ConnectedTime", Tick64ToTime64(c->ConnectedTick));
 
 			PackAddStr(p, "HubName", h->Name);
 			PackAddBool(p, "StaticHub", h->Type == HUB_TYPE_FARM_STATIC);
@@ -7306,8 +7253,8 @@ void SiCalledEnumHub(SERVER *s, PACK *p, PACK *req)
 
 				PackAddIntEx(p, "NumIpTables", LIST_NUM(h->IpTable), i, num);
 
-				PackAddInt64Ex(p, "LastCommTime", h->LastCommTime, i, num);
-				PackAddInt64Ex(p, "CreatedTime", h->CreatedTime, i, num);
+				PackAddTime64Ex(p, "LastCommTime", h->LastCommTime, i, num);
+				PackAddTime64Ex(p, "CreatedTime", h->CreatedTime, i, num);
 			}
 			Unlock(h->lock);
 		}
@@ -10157,12 +10104,17 @@ void SiFarmServMain(SERVER *server, SOCK *sock, FARM_MEMBER *f)
 				}
 
 				// Receive
-				p = HttpServerRecv(sock);
+				p = HttpServerRecvEx(sock, FIRM_SERV_RECV_PACK_MAX_SIZE);
 
 				t->Response = p;
 				Set(t->CompleteEvent);
 
-				send_noop = false;
+				if (p == NULL)
+				{
+					// Avoid infinite loop
+					Disconnect(sock);
+					goto DISCONNECTED;
+				}
 			}
 		}
 		while (t != NULL);

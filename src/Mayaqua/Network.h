@@ -1,111 +1,5 @@
 // SoftEther VPN Source Code - Developer Edition Master Branch
 // Mayaqua Kernel
-// 
-// SoftEther VPN Server, Client and Bridge are free software under GPLv2.
-// 
-// Copyright (c) Daiyuu Nobori.
-// Copyright (c) SoftEther VPN Project, University of Tsukuba, Japan.
-// Copyright (c) SoftEther Corporation.
-// 
-// All Rights Reserved.
-// 
-// http://www.softether.org/
-// 
-// Author: Daiyuu Nobori, Ph.D.
-// Comments: Tetsuo Sugiyama, Ph.D.
-// 
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// version 2 as published by the Free Software Foundation.
-// 
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-// 
-// You should have received a copy of the GNU General Public License version 2
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-// SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-// 
-// THE LICENSE AGREEMENT IS ATTACHED ON THE SOURCE-CODE PACKAGE
-// AS "LICENSE.TXT" FILE. READ THE TEXT FILE IN ADVANCE TO USE THE SOFTWARE.
-// 
-// 
-// THIS SOFTWARE IS DEVELOPED IN JAPAN, AND DISTRIBUTED FROM JAPAN,
-// UNDER JAPANESE LAWS. YOU MUST AGREE IN ADVANCE TO USE, COPY, MODIFY,
-// MERGE, PUBLISH, DISTRIBUTE, SUBLICENSE, AND/OR SELL COPIES OF THIS
-// SOFTWARE, THAT ANY JURIDICAL DISPUTES WHICH ARE CONCERNED TO THIS
-// SOFTWARE OR ITS CONTENTS, AGAINST US (SOFTETHER PROJECT, SOFTETHER
-// CORPORATION, DAIYUU NOBORI OR OTHER SUPPLIERS), OR ANY JURIDICAL
-// DISPUTES AGAINST US WHICH ARE CAUSED BY ANY KIND OF USING, COPYING,
-// MODIFYING, MERGING, PUBLISHING, DISTRIBUTING, SUBLICENSING, AND/OR
-// SELLING COPIES OF THIS SOFTWARE SHALL BE REGARDED AS BE CONSTRUED AND
-// CONTROLLED BY JAPANESE LAWS, AND YOU MUST FURTHER CONSENT TO
-// EXCLUSIVE JURISDICTION AND VENUE IN THE COURTS SITTING IN TOKYO,
-// JAPAN. YOU MUST WAIVE ALL DEFENSES OF LACK OF PERSONAL JURISDICTION
-// AND FORUM NON CONVENIENS. PROCESS MAY BE SERVED ON EITHER PARTY IN
-// THE MANNER AUTHORIZED BY APPLICABLE LAW OR COURT RULE.
-// 
-// USE ONLY IN JAPAN. DO NOT USE THIS SOFTWARE IN ANOTHER COUNTRY UNLESS
-// YOU HAVE A CONFIRMATION THAT THIS SOFTWARE DOES NOT VIOLATE ANY
-// CRIMINAL LAWS OR CIVIL RIGHTS IN THAT PARTICULAR COUNTRY. USING THIS
-// SOFTWARE IN OTHER COUNTRIES IS COMPLETELY AT YOUR OWN RISK. THE
-// SOFTETHER VPN PROJECT HAS DEVELOPED AND DISTRIBUTED THIS SOFTWARE TO
-// COMPLY ONLY WITH THE JAPANESE LAWS AND EXISTING CIVIL RIGHTS INCLUDING
-// PATENTS WHICH ARE SUBJECTS APPLY IN JAPAN. OTHER COUNTRIES' LAWS OR
-// CIVIL RIGHTS ARE NONE OF OUR CONCERNS NOR RESPONSIBILITIES. WE HAVE
-// NEVER INVESTIGATED ANY CRIMINAL REGULATIONS, CIVIL LAWS OR
-// INTELLECTUAL PROPERTY RIGHTS INCLUDING PATENTS IN ANY OF OTHER 200+
-// COUNTRIES AND TERRITORIES. BY NATURE, THERE ARE 200+ REGIONS IN THE
-// WORLD, WITH DIFFERENT LAWS. IT IS IMPOSSIBLE TO VERIFY EVERY
-// COUNTRIES' LAWS, REGULATIONS AND CIVIL RIGHTS TO MAKE THE SOFTWARE
-// COMPLY WITH ALL COUNTRIES' LAWS BY THE PROJECT. EVEN IF YOU WILL BE
-// SUED BY A PRIVATE ENTITY OR BE DAMAGED BY A PUBLIC SERVANT IN YOUR
-// COUNTRY, THE DEVELOPERS OF THIS SOFTWARE WILL NEVER BE LIABLE TO
-// RECOVER OR COMPENSATE SUCH DAMAGES, CRIMINAL OR CIVIL
-// RESPONSIBILITIES. NOTE THAT THIS LINE IS NOT LICENSE RESTRICTION BUT
-// JUST A STATEMENT FOR WARNING AND DISCLAIMER.
-// 
-// 
-// SOURCE CODE CONTRIBUTION
-// ------------------------
-// 
-// Your contribution to SoftEther VPN Project is much appreciated.
-// Please send patches to us through GitHub.
-// Read the SoftEther VPN Patch Acceptance Policy in advance:
-// http://www.softether.org/5-download/src/9.patch
-// 
-// 
-// DEAR SECURITY EXPERTS
-// ---------------------
-// 
-// If you find a bug or a security vulnerability please kindly inform us
-// about the problem immediately so that we can fix the security problem
-// to protect a lot of users around the world as soon as possible.
-// 
-// Our e-mail address for security reports is:
-// softether-vpn-security [at] softether.org
-// 
-// Please note that the above e-mail address is not a technical support
-// inquiry address. If you need technical assistance, please visit
-// http://www.softether.org/ and ask your question on the users forum.
-// 
-// Thank you for your cooperation.
-// 
-// 
-// NO MEMORY OR RESOURCE LEAKS
-// ---------------------------
-// 
-// The memory-leaks and resource-leaks verification under the stress
-// test has been passed before release this source code.
 
 
 // Network.h
@@ -160,7 +54,7 @@ struct DYN_VALUE
 #define	SSL_LOGGING_DIRNAME			"@ssl_log"
 
 // Private IP list file
-#define	PRIVATE_IP_TXT_FILENAME		"@private_ip.txt"
+#define	PRIVATE_IP_TXT_FILENAME		"$private_ip.txt"
 
 // Start range of the random UDP port
 #define	RAND_UDP_PORT_START			5000
@@ -184,7 +78,7 @@ struct DYN_VALUE
 // IP address
 struct IP
 {
-	UCHAR addr[4];					// IPv4 address, (meaning that 223.255.255.254 = IPv6)
+	UCHAR addr[4];					// IPv4 address, (meaning that 192.0.2.254 = IPv6)
 	UCHAR ipv6_addr[16];			// IPv6 address
 	UINT ipv6_scope_id;				// IPv6 scope ID
 };
@@ -315,6 +209,7 @@ struct SOCK
 	UINT CurrentTtl;			// Current TTL value
 	RUDP_STACK *R_UDP_Stack;	// R-UDP stack
 	char UnderlayProtocol[64];	// Underlying protocol
+	char ProtocolDetails[256];	// Protocol details
 	QUEUE *ReverseAcceptQueue;	// Accept queue for the reverse socket
 	EVENT *ReverseAcceptEvent;	// Accept event for the reverse socket
 	bool IsReverseAcceptedSocket;	// Whether it is a reverse socket
@@ -562,6 +457,16 @@ struct TUBEPAIR_DATA
 	SOCK_EVENT *SockEvent1, *SockEvent2;	// SockEvent
 };
 
+// TCP raw data
+struct TCP_RAW_DATA
+{
+	IP SrcIP;							// Source IP address
+	IP DstIP;							// Destination IP address
+	UINT SrcPort;						// Source port
+	UINT DstPort;						// Destination port
+	FIFO *Data;							// Data body
+};
+
 // UDP listener socket entry
 struct UDPLISTENER_SOCK
 {
@@ -602,6 +507,7 @@ struct UDPLISTENER
 	UINT64 LastCheckTick;				// Time which the socket list was checked last
 	UDPLISTENER_RECV_PROC *RecvProc;	// Receive procedure
 	LIST *SendPacketList;				// Transmission packet list
+	UINT PacketType;					// The type to set when creating an UDPPACKET
 	void *Param;						// Parameters
 	INTERRUPT_MANAGER *Interrupts;		// Interrupt manager
 	bool HostIPAddressListChanged;		// IP address list of the host has changed
@@ -670,6 +576,12 @@ struct IPBLOCK
 #define	RUDP_TIMEOUT					12000		// Time-out of R-UDP communication
 #define	RUDP_DIRECT_CONNECT_TIMEOUT		5000		// R-UDP direct connection time-out
 #define	RUDP_MAX_SEGMENT_SIZE			512			// Maximum segment size
+#define	RUDP_BULK_KEY_SIZE_MAX			128			// Bulk key size Max
+
+#define	RUDP_BULK_KEY_SIZE_V2			32			// V2: Bulk key size
+#define	RUDP_BULK_IV_SIZE_V2			12			// V2: Bulk IV size
+#define	RUDP_BULK_MAC_SIZE_V2			16			// V2: Bulk MAC size
+
 // Maximum R-UDP packet size
 #define	RUDP_MAX_PACKET_SIZE			(RUDP_MAX_SEGMENT_SIZE + sizeof(UINT64) * RUDP_MAX_NUM_ACK + SHA1_SIZE * 2 + sizeof(UINT64) * 4 + sizeof(UINT) + 255)
 #define	RUDP_MAX_NUM_ACK				64			// Maximum number of ACKs
@@ -758,6 +670,7 @@ struct RUDP_SESSION
 	UINT64 BulkNextSeqNo;				// Next SEQ NO to the bulk send
 	bool FlushBulkSendTube;				// Flag to be Flush the bulk send Tube
 	UINT64 BulkRecvSeqNoMax;			// Highest sequence number received
+	UCHAR BulkNextIv_V2[RUDP_BULK_IV_SIZE_V2];	// Next IV to the bulk send (version 2)
 };
 
 // NAT Traversal Server Information
@@ -969,53 +882,6 @@ struct NIC_ENTRY
 	UCHAR MacAddress[6];
 };
 
-
-// HTTP value
-struct HTTP_VALUE
-{
-	char *Name;						// Name
-	char *Data;						// Data
-};
-
-// HTTP header
-struct HTTP_HEADER
-{
-	char *Method;					// Method
-	char *Target;					// Target
-	char *Version;					// Version
-	LIST *ValueList;				// Value list
-};
-
-// HTTPS server / client related string constant
-#define	DEFAULT_USER_AGENT	"Mozilla/5.0 (Windows NT 6.3; WOW64; rv:29.0) Gecko/20100101 Firefox/29.0"
-#define	DEFAULT_ACCEPT		"image/gif, image/x-xbitmap, image/jpeg, image/pjpeg, application/x-shockwave-flash, application/msword, application/vnd.ms-powerpoint, application/vnd.ms-excel, */*"
-#define	DEFAULT_ENCODING	"gzip, deflate"
-#define	HTTP_CONTENT_TYPE	"text/html; charset=iso-8859-1"
-#define	HTTP_CONTENT_TYPE2	"application/octet-stream"
-#define	HTTP_CONTENT_TYPE3	"image/jpeg"
-#define	HTTP_CONTENT_TYPE4	"text/html"
-#define	HTTP_CONTENT_TYPE5	"message/rfc822"
-#define	HTTP_KEEP_ALIVE		"timeout=15; max=19"
-#define	HTTP_VPN_TARGET		"/vpnsvc/vpn.cgi"
-#define	HTTP_VPN_TARGET2	"/vpnsvc/connect.cgi"
-#define HTTP_VPN_TARGET_POSTDATA	"VPNCONNECT"
-#define	HTTP_SAITAMA		"/saitama.jpg"
-#define	HTTP_PICTURES		"/picture"
-// Maximum size of the custom HTTP header
-#define	HTTP_CUSTOM_HEADER_MAX_SIZE	1024
-// Maximum size of a single line in the HTTP header
-#define	HTTP_HEADER_LINE_MAX_SIZE	4096
-// Maximum number of lines in the HTTP header
-#define	HTTP_HEADER_MAX_LINES		128
-// Maximum size of the random number to be included in the PACK
-#define	HTTP_PACK_RAND_SIZE_MAX		1000
-// Maximum PACK size in the HTTP
-#define	HTTP_PACK_MAX_SIZE			65536
-
-
-
-
-
 int GetCurrentTimezone();
 
 bool GetSniNameFromSslPacket(UCHAR *packet_buf, UINT packet_size, char *sni, UINT sni_size);
@@ -1029,15 +895,6 @@ bool IsUseAlternativeHostname();
 int GetCurrentTimezoneWin32();
 #endif	// OS_WIN32
 
-HTTP_VALUE *GetHttpValue(HTTP_HEADER *header, char *name);
-void AddHttpValue(HTTP_HEADER *header, HTTP_VALUE *value);
-bool AddHttpValueStr(HTTP_HEADER* header, char *string);
-HTTP_HEADER *NewHttpHeader(char *method, char *target, char *version);
-HTTP_HEADER *NewHttpHeaderEx(char *method, char *target, char *version, bool no_sort);
-int CompareHttpValue(void *p1, void *p2);
-void FreeHttpValue(HTTP_VALUE *value);
-void FreeHttpHeader(HTTP_HEADER *header);
-
 bool SendPack(SOCK *s, PACK *p);
 PACK *RecvPack(SOCK *s);
 PACK *RecvPackWithHash(SOCK *s);
@@ -1048,21 +905,7 @@ PACK *PackError(UINT error);
 
 void CreateDummyValue(PACK *p);
 
-HTTP_VALUE *NewHttpValue(char *name, char *data);
 char *RecvLine(SOCK *s, UINT max_size);
-HTTP_HEADER *RecvHttpHeader(SOCK *s);
-bool SendHttpHeader(SOCK *s, HTTP_HEADER *header);
-char *HttpHeaderToStr(HTTP_HEADER *header);
-bool PostHttp(SOCK *s, HTTP_HEADER *header, void *post_data, UINT post_size);
-UINT GetContentLength(HTTP_HEADER *header);
-void GetHttpDateStr(char *str, UINT size, UINT64 t);
-bool HttpSendForbidden(SOCK *s, char *target, char *server_id);
-bool HttpSendNotFound(SOCK *s, char *target);
-bool HttpSendNotImplemented(SOCK *s, char *method, char *target, char *version);
-bool HttpServerSend(SOCK *s, PACK *p);
-bool HttpClientSend(SOCK *s, PACK *p);
-PACK *HttpServerRecv(SOCK *s);
-PACK *HttpClientRecv(SOCK *s);
 
 bool GetIPViaDnsProxyForJapanFlets(IP *ip_ret, char *hostname, bool ipv6, UINT timeout, bool *cancel, char *dns_proxy_hostname);
 bool GetDnsProxyIPAddressForJapanBFlets(IP *ip_ret, UINT timeout, bool *cancel);
@@ -1298,6 +1141,7 @@ void SendAdd(SOCK *sock, void *data, UINT size);
 bool SendNow(SOCK *sock, int secure);
 bool RecvAll(SOCK *sock, void *data, UINT size, bool secure);
 bool RecvAllEx(SOCK *sock, void **data_new_ptr, UINT size, bool secure);
+bool RecvAllWithDiscard(SOCK *sock, UINT size, bool secure);
 void InitSockSet(SOCKSET *set);
 void AddSockSet(SOCKSET *set, SOCK *sock);
 CANCEL *NewCancel();
@@ -1402,6 +1246,9 @@ void RouteToStr(char *str, UINT str_size, ROUTE_ENTRY *e);
 void DebugPrintRoute(ROUTE_ENTRY *e);
 void DebugPrintRouteTable(ROUTE_TABLE *r);
 bool IsIPv6LocalNetworkAddress(IP *ip);
+void AddProtocolDetailsStr(char *dst, UINT dst_size, char *str);
+void AddProtocolDetailsKeyValueStr(char *dst, UINT dst_size, char *key, char *value);
+void AddProtocolDetailsKeyValueInt(char *dst, UINT dst_size, char *key, UINT value);
 
 #ifdef	ENABLE_SSL_LOGGING
 void SockEnableSslLogging(SOCK *s);
@@ -1413,6 +1260,7 @@ void SocketTimeoutThread(THREAD *t, void *param);
 SOCKET_TIMEOUT_PARAM *NewSocketTimeout(SOCK *sock);
 void FreeSocketTimeout(SOCKET_TIMEOUT_PARAM *ttp);
 
+void CopyIP(IP *dst, IP *src);
 bool IsIP6(IP *ip);
 bool IsIP4(IP *ip);
 void IPv6AddrToIP(IP *ip, IPV6_ADDR *addr);
@@ -1507,12 +1355,15 @@ int CmpIpAddressList(void *p1, void *p2);
 UINT64 GetHostIPAddressListHash();
 
 UDPLISTENER *NewUdpListener(UDPLISTENER_RECV_PROC *recv_proc, void *param, IP *listen_ip);
+UDPLISTENER *NewUdpListenerEx(UDPLISTENER_RECV_PROC *recv_proc, void *param, IP *listen_ip, UINT packet_type);
 void UdpListenerThread(THREAD *thread, void *param);
 void FreeUdpListener(UDPLISTENER *u);
 void AddPortToUdpListener(UDPLISTENER *u, UINT port);
 void DeletePortFromUdpListener(UDPLISTENER *u, UINT port);
 void DeleteAllPortFromUdpListener(UDPLISTENER *u);
 void UdpListenerSendPackets(UDPLISTENER *u, LIST *packet_list);
+TCP_RAW_DATA *NewTcpRawData(IP *src_ip, UINT src_port, IP *dst_ip, UINT dst_port);
+void FreeTcpRawData(TCP_RAW_DATA *trd);
 UDPPACKET *NewUdpPacket(IP *src_ip, UINT src_port, IP *dst_ip, UINT dst_port, void *data, UINT size);
 void FreeUdpPacket(UDPPACKET *p);
 UDPLISTENER_SOCK *DetermineUdpSocketForSending(UDPLISTENER *u, UDPPACKET *p);

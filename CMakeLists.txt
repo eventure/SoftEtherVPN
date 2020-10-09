@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.7)
 
 project("SoftEther VPN"
-  VERSION 5.01.9666
+  VERSION 5.01.9674
   LANGUAGES C
 )
 
@@ -41,6 +41,9 @@ if(UNIX)
 
   include(CheckIncludeFile)
   Check_Include_File(sys/auxv.h HAVE_SYS_AUXV)
+  if(EXISTS "/lib/systemd/system")
+    set(CMAKE_INSTALL_SYSTEMD_UNITDIR "/lib/systemd/system" CACHE STRING "Where to install systemd unit files")
+  endif()
 endif()
 
 configure_file("${TOP_DIRECTORY}/AUTHORS.TXT" "${TOP_DIRECTORY}/src/bin/hamcore/authors.txt" COPYONLY)
@@ -85,7 +88,7 @@ if(UNIX)
   set(CPACK_RPM_COMPONENT_INSTALL ON)
   set(CPACK_RPM_FILE_NAME "RPM-DEFAULT")
   set(CPACK_RPM_PACKAGE_GROUP "Applications/Internet")
-  set(CPACK_RPM_PACKAGE_LICENSE "GPLv2")
+  set(CPACK_RPM_PACKAGE_LICENSE "ASL 2.0")
 
   include(CPack)
 endif()

@@ -1,111 +1,5 @@
 // SoftEther VPN Source Code - Developer Edition Master Branch
 // Mayaqua Kernel
-// 
-// SoftEther VPN Server, Client and Bridge are free software under GPLv2.
-// 
-// Copyright (c) Daiyuu Nobori.
-// Copyright (c) SoftEther VPN Project, University of Tsukuba, Japan.
-// Copyright (c) SoftEther Corporation.
-// 
-// All Rights Reserved.
-// 
-// http://www.softether.org/
-// 
-// Author: Daiyuu Nobori, Ph.D.
-// Comments: Tetsuo Sugiyama, Ph.D.
-// 
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// version 2 as published by the Free Software Foundation.
-// 
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-// 
-// You should have received a copy of the GNU General Public License version 2
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-// SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-// 
-// THE LICENSE AGREEMENT IS ATTACHED ON THE SOURCE-CODE PACKAGE
-// AS "LICENSE.TXT" FILE. READ THE TEXT FILE IN ADVANCE TO USE THE SOFTWARE.
-// 
-// 
-// THIS SOFTWARE IS DEVELOPED IN JAPAN, AND DISTRIBUTED FROM JAPAN,
-// UNDER JAPANESE LAWS. YOU MUST AGREE IN ADVANCE TO USE, COPY, MODIFY,
-// MERGE, PUBLISH, DISTRIBUTE, SUBLICENSE, AND/OR SELL COPIES OF THIS
-// SOFTWARE, THAT ANY JURIDICAL DISPUTES WHICH ARE CONCERNED TO THIS
-// SOFTWARE OR ITS CONTENTS, AGAINST US (SOFTETHER PROJECT, SOFTETHER
-// CORPORATION, DAIYUU NOBORI OR OTHER SUPPLIERS), OR ANY JURIDICAL
-// DISPUTES AGAINST US WHICH ARE CAUSED BY ANY KIND OF USING, COPYING,
-// MODIFYING, MERGING, PUBLISHING, DISTRIBUTING, SUBLICENSING, AND/OR
-// SELLING COPIES OF THIS SOFTWARE SHALL BE REGARDED AS BE CONSTRUED AND
-// CONTROLLED BY JAPANESE LAWS, AND YOU MUST FURTHER CONSENT TO
-// EXCLUSIVE JURISDICTION AND VENUE IN THE COURTS SITTING IN TOKYO,
-// JAPAN. YOU MUST WAIVE ALL DEFENSES OF LACK OF PERSONAL JURISDICTION
-// AND FORUM NON CONVENIENS. PROCESS MAY BE SERVED ON EITHER PARTY IN
-// THE MANNER AUTHORIZED BY APPLICABLE LAW OR COURT RULE.
-// 
-// USE ONLY IN JAPAN. DO NOT USE THIS SOFTWARE IN ANOTHER COUNTRY UNLESS
-// YOU HAVE A CONFIRMATION THAT THIS SOFTWARE DOES NOT VIOLATE ANY
-// CRIMINAL LAWS OR CIVIL RIGHTS IN THAT PARTICULAR COUNTRY. USING THIS
-// SOFTWARE IN OTHER COUNTRIES IS COMPLETELY AT YOUR OWN RISK. THE
-// SOFTETHER VPN PROJECT HAS DEVELOPED AND DISTRIBUTED THIS SOFTWARE TO
-// COMPLY ONLY WITH THE JAPANESE LAWS AND EXISTING CIVIL RIGHTS INCLUDING
-// PATENTS WHICH ARE SUBJECTS APPLY IN JAPAN. OTHER COUNTRIES' LAWS OR
-// CIVIL RIGHTS ARE NONE OF OUR CONCERNS NOR RESPONSIBILITIES. WE HAVE
-// NEVER INVESTIGATED ANY CRIMINAL REGULATIONS, CIVIL LAWS OR
-// INTELLECTUAL PROPERTY RIGHTS INCLUDING PATENTS IN ANY OF OTHER 200+
-// COUNTRIES AND TERRITORIES. BY NATURE, THERE ARE 200+ REGIONS IN THE
-// WORLD, WITH DIFFERENT LAWS. IT IS IMPOSSIBLE TO VERIFY EVERY
-// COUNTRIES' LAWS, REGULATIONS AND CIVIL RIGHTS TO MAKE THE SOFTWARE
-// COMPLY WITH ALL COUNTRIES' LAWS BY THE PROJECT. EVEN IF YOU WILL BE
-// SUED BY A PRIVATE ENTITY OR BE DAMAGED BY A PUBLIC SERVANT IN YOUR
-// COUNTRY, THE DEVELOPERS OF THIS SOFTWARE WILL NEVER BE LIABLE TO
-// RECOVER OR COMPENSATE SUCH DAMAGES, CRIMINAL OR CIVIL
-// RESPONSIBILITIES. NOTE THAT THIS LINE IS NOT LICENSE RESTRICTION BUT
-// JUST A STATEMENT FOR WARNING AND DISCLAIMER.
-// 
-// 
-// SOURCE CODE CONTRIBUTION
-// ------------------------
-// 
-// Your contribution to SoftEther VPN Project is much appreciated.
-// Please send patches to us through GitHub.
-// Read the SoftEther VPN Patch Acceptance Policy in advance:
-// http://www.softether.org/5-download/src/9.patch
-// 
-// 
-// DEAR SECURITY EXPERTS
-// ---------------------
-// 
-// If you find a bug or a security vulnerability please kindly inform us
-// about the problem immediately so that we can fix the security problem
-// to protect a lot of users around the world as soon as possible.
-// 
-// Our e-mail address for security reports is:
-// softether-vpn-security [at] softether.org
-// 
-// Please note that the above e-mail address is not a technical support
-// inquiry address. If you need technical assistance, please visit
-// http://www.softether.org/ and ask your question on the users forum.
-// 
-// Thank you for your cooperation.
-// 
-// 
-// NO MEMORY OR RESOURCE LEAKS
-// ---------------------------
-// 
-// The memory-leaks and resource-leaks verification under the stress
-// test has been passed before release this source code.
 
 
 // Encrypt.c
@@ -124,6 +18,7 @@
 #include <stdarg.h>
 #include <time.h>
 #include <errno.h>
+#include <openssl/crypto.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/rand.h>
@@ -139,7 +34,9 @@
 #include <openssl/sha.h>
 #include <openssl/des.h>
 #include <openssl/aes.h>
+#include <openssl/rsa.h>
 #include <openssl/dh.h>
+#include <openssl/bn.h>
 #include <openssl/pem.h>
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
@@ -861,9 +758,18 @@ BUF *BigNumToBuf(const BIGNUM *bn)
 	return b;
 }
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+// Return the thread ID
+static void OpenSSL_Id(CRYPTO_THREADID *id)
+{
+	CRYPTO_THREADID_set_numeric(id, (unsigned long)ThreadId());
+}
+#endif
+
 // Initialization of the lock of OpenSSL
 void OpenSSL_InitLock()
 {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	UINT i;
 
 	// Initialization of the lock object
@@ -876,12 +782,14 @@ void OpenSSL_InitLock()
 
 	// Setting the lock function
 	CRYPTO_set_locking_callback(OpenSSL_Lock);
-	CRYPTO_set_id_callback(OpenSSL_Id);
+	CRYPTO_THREADID_set_callback(OpenSSL_Id);
+#endif
 }
 
 // Release of the lock of OpenSSL
 void OpenSSL_FreeLock()
 {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	UINT i;
 
 	for (i = 0;i < ssl_lock_num;i++)
@@ -892,12 +800,14 @@ void OpenSSL_FreeLock()
 	ssl_lock_obj = NULL;
 
 	CRYPTO_set_locking_callback(NULL);
-	CRYPTO_set_id_callback(NULL);
+	CRYPTO_THREADID_set_callback(NULL);
+#endif
 }
 
 // Lock function for OpenSSL
 void OpenSSL_Lock(int mode, int n, const char *file, int line)
 {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	LOCK *lock = ssl_lock_obj[n];
 
 	if (mode & CRYPTO_LOCK)
@@ -910,12 +820,7 @@ void OpenSSL_Lock(int mode, int n, const char *file, int line)
 		// Unlock
 		Unlock(lock);
 	}
-}
-
-// Return the thread ID
-unsigned long OpenSSL_Id(void)
-{
-	return (unsigned long)ThreadId();
+#endif
 }
 
 char *OpenSSL_Error()
@@ -1709,7 +1614,7 @@ X509 *NewX509(K *pub, K *priv, X *ca, NAME *name, UINT days, X_SERIAL *serial)
 {
 	X509 *x509;
 	UINT64 notBefore, notAfter;
-	ASN1_TIME *t1, *t2;
+	const ASN1_TIME *t1, *t2;
 	X509_NAME *subject_name, *issuer_name;
 	X509_EXTENSION *ex = NULL;
 	X509_EXTENSION *eku = NULL;
@@ -1743,14 +1648,14 @@ X509 *NewX509(K *pub, K *priv, X *ca, NAME *name, UINT days, X_SERIAL *serial)
 	X509_set_version(x509, 2L);
 
 	// Set the Expiration
-	t1 = X509_get_notBefore(x509);
-	t2 = X509_get_notAfter(x509);
-	if (!UINT64ToAsn1Time(t1, notBefore))
+	t1 = X509_get0_notBefore(x509);
+	t2 = X509_get0_notAfter(x509);
+	if (!UINT64ToAsn1Time((void *)t1, notBefore))
 	{
 		FreeX509(x509);
 		return NULL;
 	}
-	if (!UINT64ToAsn1Time(t2, notAfter))
+	if (!UINT64ToAsn1Time((void *)t2, notAfter))
 	{
 		FreeX509(x509);
 		return NULL;
@@ -1847,7 +1752,7 @@ X509 *NewRootX509(K *pub, K *priv, NAME *name, UINT days, X_SERIAL *serial)
 {
 	X509 *x509;
 	UINT64 notBefore, notAfter;
-	ASN1_TIME *t1, *t2;
+	const ASN1_TIME *t1, *t2;
 	X509_NAME *subject_name, *issuer_name;
 	X509_EXTENSION *ex = NULL;
 	X509_EXTENSION *eku = NULL;
@@ -1885,14 +1790,14 @@ X509 *NewRootX509(K *pub, K *priv, NAME *name, UINT days, X_SERIAL *serial)
 	X509_set_version(x509, 2L);
 
 	// Set the Expiration
-	t1 = X509_get_notBefore(x509);
-	t2 = X509_get_notAfter(x509);
-	if (!UINT64ToAsn1Time(t1, notBefore))
+	t1 = X509_get0_notBefore(x509);
+	t2 = X509_get0_notAfter(x509);
+	if (!UINT64ToAsn1Time((void *)t1, notBefore))
 	{
 		FreeX509(x509);
 		return NULL;
 	}
-	if (!UINT64ToAsn1Time(t2, notAfter))
+	if (!UINT64ToAsn1Time((void *)t2, notAfter))
 	{
 		FreeX509(x509);
 		return NULL;
@@ -2302,7 +2207,9 @@ bool RsaVerify(void *data, UINT data_size, void *sign, K *k)
 bool RsaVerifyEx(void *data, UINT data_size, void *sign, K *k, UINT bits)
 {
 	UCHAR hash_data[SIGN_HASH_SIZE];
-	UCHAR decrypt_data[SIGN_HASH_SIZE];
+	UCHAR *decrypt_data;
+	RSA *rsa;
+	UINT rsa_size;
 	// Validate arguments
 	if (data == NULL || sign == NULL || k == NULL || k->private_key != false)
 	{
@@ -2313,23 +2220,37 @@ bool RsaVerifyEx(void *data, UINT data_size, void *sign, K *k, UINT bits)
 		bits = RSA_KEY_SIZE;
 	}
 
+	rsa = EVP_PKEY_get0_RSA(k->pkey);
+	if (rsa == NULL)
+	{
+		return false;
+	}
+
 	// Hash the data
 	if (HashForSign(hash_data, sizeof(hash_data), data, data_size) == false)
 	{
 		return false;
 	}
 
+	rsa_size = RSA_size(rsa);
+	rsa_size = MAX(rsa_size, 1024); // For just in case
+	decrypt_data = ZeroMalloc(rsa_size);
+
 	// Decode the signature
-	if (RSA_public_decrypt(bits / 8, sign, decrypt_data, EVP_PKEY_get0_RSA(k->pkey), RSA_PKCS1_PADDING) <= 0)
+	if (RSA_public_decrypt(bits / 8, sign, decrypt_data, rsa, RSA_PKCS1_PADDING) <= 0)
 	{
+		Free(decrypt_data);
 		return false;
 	}
 
 	// Comparison
 	if (Cmp(decrypt_data, hash_data, SIGN_HASH_SIZE) != 0)
 	{
+		Free(decrypt_data);
 		return false;
 	}
+
+	Free(decrypt_data);
 
 	return true;
 }
@@ -3790,6 +3711,10 @@ void FreeOpenSSLThreadState()
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 	CRYPTO_cleanup_all_ex_data();
 	ERR_remove_thread_state(NULL);
+#else
+#ifndef LIBRESSL_VERSION_NUMBER
+	OPENSSL_thread_stop();
+#endif
 #endif
 }
 
@@ -3806,11 +3731,13 @@ void FreeCryptLibrary()
 	openssl_lock = NULL;
 //	RAND_Free_For_SoftEther();
 	OpenSSL_FreeLock();
-
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 #ifdef OPENSSL_FIPS
 	FIPS_mode_set(0);
 #endif
+#ifndef OPENSSL_NO_ENGINE
 	ENGINE_cleanup();
+#endif
 	CONF_modules_unload(1);
 	EVP_cleanup();
 
@@ -3821,6 +3748,7 @@ void FreeCryptLibrary()
 #ifndef OPENSSL_NO_COMP
 	SSL_COMP_free_compression_methods();
 #endif
+#endif
 }
 
 // Initialize the Crypt library
@@ -3828,6 +3756,7 @@ void InitCryptLibrary()
 {
 	char tmp[16];
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 //	RAND_Init_For_SoftEther()
 	openssl_lock = NewLock();
 	SSL_library_init();
@@ -3836,6 +3765,7 @@ void InitCryptLibrary()
 	OpenSSL_add_all_digests();
 	ERR_load_crypto_strings();
 	SSL_load_error_strings();
+#endif
 
 	ssl_clientcert_index = SSL_get_ex_new_index(0, "struct SslClientCertInfo *", NULL, NULL, NULL);
 
@@ -4502,7 +4432,7 @@ static UINT Internal_HMac(const EVP_MD *md, void *dest, void *key, UINT key_size
 		goto final;
 	}
 
-	len = MdProcess(m, dest, src, src_size);
+	len = MdProcess(m, dest, (void *)src, src_size);
 	if (len == 0)
 	{
 		Debug("Internal_HMac(): MdProcess() returned 0!\n");

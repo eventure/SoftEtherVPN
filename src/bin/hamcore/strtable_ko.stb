@@ -1,7 +1,8 @@
 # SoftEther VPN String Table
-# Copyright (c) SoftEther VPN Project. All Rights Reserved.
-#
-# http://www.softether.co.jp/
+# Copyright (c) all contributors on SoftEther VPN project in GitHub.
+# Copyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.
+# 
+# https://www.softether.org/
 # 
 # KOREAN TRANSLATION by Jioh L. Jung (ziozzang@gmail.com)
 # - Powered by Google Translator (From Japanese to Korean)
@@ -163,11 +164,11 @@ ERR_91 가상 레이어 3 스위치 연결이 끊어 수 없습니다. 세션을
 ERR_92 지정된 이름의 가상 레이어 3 스위치는 이미 존재합니다. 다른 이름을 지정하십시오.
 ERR_93 지정된 이름의 가상 레이어 3 스위치가 없습니다.
 ERR_94 지정된 이름이 잘못되었습니다. 사용할 수없는 문자가 포함되어 있는지 확인하십시오.
-ERR_95 가상 레이어 3 인터페이스의 추가에 실패했습니다.
-ERR_96 가상 레이어 3 인터페이스의 삭제에 실패했습니다.
+ERR_95 가상 레이어 3 인터페이스의 추가에 실패했습니다. Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting interfaces are unable when the Virtual Layer 3 switch is running.
+ERR_96 가상 레이어 3 인터페이스의 삭제에 실패했습니다. Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting interfaces are unable when the Virtual Layer 3 switch is running.
 ERR_97 지정된 가상 레이어 3 인터페이스가 연결된 가상 HUB에 연결하는 가상 레이어 3 인터페이스가 가상 레이어 3 스위치에 이미 존재합니다. 하나의 가상 레이어 3 스위치에서 동일한 가상 HUB에 연결하는 가상 레이어 3 인터페이스는 하나 밖에 정의 할 수 없습니다.
-ERR_98 라우팅 테이블 추가에 실패했습니다.
-ERR_99 라우팅 테이블의 삭제에 실패했습니다.
+ERR_98 라우팅 테이블 추가에 실패했습니다. Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting routing table entries are unable when the Virtual Layer 3 switch is running.
+ERR_99 라우팅 테이블의 삭제에 실패했습니다. Please check that the parameters are valid. Also please make sure that the Virtual Layer 3 switch is stopped. Adding or deleting routing table entries are unable when the Virtual Layer 3 switch is running.
 ERR_100 지정된 라우팅 테이블이 이미 존재합니다.
 ERR_101 클라이언트와 서버 사이의 시계가 어긋나 있습니다. 시간 설정을 확인하십시오.
 ERR_102 이 가상 레이어 3 스위치를 시작할 수 없습니다. \r\n\r\n 가상 레이어 3 스위치를 시작하려면 최소한 1 개의 가상 인터페이스가 가상 레이어 3 스위치에 정의되어 있어야합니다.
@@ -1079,7 +1080,7 @@ SVC_HIDE_TRAY_MSG %S 사용자 모드 시작시 시스템 트레이 아이콘을
 
 
 # 서비스 관계 (UNIX)
-UNIX_SVC_HELP %S service program \nCopyright (c) SoftEther VPN Project. All Rights Reserved. \n \n %S command usage:\n %S start - Start the %S service \n %S stop - Stop the %S service if the service has been already started. \n \n
+UNIX_SVC_HELP			%S service program\nCopyright (c) all contributors on SoftEther VPN project in GitHub.\nCopyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.\nAll Rights Reserved.\n\n%S command usage:\n %S start  - Start the %S service.\n %S stop   - Stop the %S service if the service has been already started.\n\n
 UNIX_SVC_STARTED The %S service has been started. \n
 UNIX_SVC_STOPPING Stopping the %S service... \n
 UNIX_SVC_STOPPED %S service has been stopped. \n
@@ -1772,6 +1773,9 @@ LS_LICENSE_NOT_VPNSERVER 연결 "%S": 라이센스 오류가 발생했습니다.
 LS_LICENSE_NOT_VPNCLUSTER 연결 "%S": 라이센스 오류가 발생했습니다. 이 VPN Server는 현재 클러스터링 기능을 사용할 수없는 종류의 라이센스가 등록되어 있지만 클러스터 모드로 실행 중에 VPN Client가 연결을 시도했습니다. VPN Server를 다시 시작해야합니다.
 LS_LICENSE_VIOLATION 연결 "%S": VPN Server에서 라이센스 위반이 발생하고 있기 때문에 연결을 받아 들일 수 없습니다.
 LS_LICENSE_VIOLATION_DETECTED 라이센스 위반을 감지했습니다. 다른 VPN Server가 이 VPN Server와 동일한 서버 ID "%I64u"으로 동작합니다. 클러스터에 동일한 라이센스를 사용하여 두 개 이상의 VPN Server가 있을 수 있습니다. 각 VPN Server의 라이센스 정보를 확인하십시오.
+LS_API_AUTH_OK			HTTPS API client "%r:%u" (%S): Administration mode: "%S": The embedded HTTPS web server accepted the successful login. Username: "%S", Method: "%S", Path: "%S"
+LS_API_AUTH_ERROR		HTTPS API client "%r:%u" (%S): The embedded HTTPS web server refused a login attempt. Username: "%S", Method: "%S", Path: "%S"
+LS_API_RPC_CALL			HTTPS API client "%r:%u" (%S): The client called a JSON-API. Method: "%S", Returned error code: %u (0 = success), Returned error message: "%s"
 
 
 # (OpenVPN 로그)
@@ -2429,7 +2433,7 @@ STATIC7 인터넷 연결 유지 기능 (&N)
 
 PREFIX D_ABOUT
 S_INFO1 SoftEther VPN %u.0 (Ver %u %02u, Build %u)
-S_INFO2 An Open-Source VPN Software for Academic Purpose, under the GPLv2 License \r\nCopyright (c) 2012- %u SoftEther Project at University of Tsukuba, Japan. All Rights Reserved. \r\nWeb Site:http://www.softether.org/\r\n%S
+S_INFO2				Licensed under the Apache License, Version 2.0.\r\nCopyright (c) 2012-%u all contributors on SoftEther VPN project in GitHub. All Rights Reserved.\r\nWeb Site: http://www.softether.org/\r\n%S
 S_INFO3 This product includes the following software components:\r\nBitVisor:Copyright (c) 2007, 2008 University of Tsukuba. Copyright (C) 2007, 2008 National Institute of Information and Communications Technology. All rights reserved./Microsoft (R) C Runtime Library:(c) 2007 Microsoft Corporation. All Rights Reserved./PKCS # 11 Cryptographic Token Interface (Cryptoki):Copyright (c) RSA Security Inc./WinPcap:Copyright (c) 2001 - 2003 NetGroup, Politecnico di Torino (Italy ). All rights reserved./libedit:Copyright (c) 1992, 1993 The Regents of the University of California. All rights reserved./libiconv:Copyright (C) 2007 Free Software Foundation, Inc./ncurses:Copyright (c) 1998 -2005, 2006 Free Software Foundation, Inc./OpenSSL:Copyright (c) 1998-2011 The OpenSSL Project. All rights reserved. This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (http://www. openssl.org/) This product includes cryptographic software written by Eric Young (eay@cryptsoft.com)/zlib:(C) 1995-2004 Jean-loup Gailly and Mark Adler/Special Thanks to:Software Laboratory, Academic Computing Communication Center, Industrial Liaison and Cooperative Research Center and Professor Yasushi Shinjo in University of Tsukuba, Japan.
 S_INFO4 이 소프트웨어는 츠쿠바 대학 SoftEther VPN 프로젝트에서 개발 된 프리웨어입니다. 본 소프트웨어는 어떠한 보증이없는 상태로 제공되는 것이며, 개발 및 배포자는 사용의 결과 손해에 대해 책임을지지 않습니다. \r\n\r\nSoftEther VPN 소프트웨어는 일본 경제 산업 성 소프트웨어 연구 개발 프로젝트의 결과물입니다. IPA (독립 행정법 인 정보 처리 추진기구)의 미답 소프트웨어 창조 사업에 채택되어 개발되었습니다. 자세한 내용은 http://www.ipa.go.jp/를 참조하십시오.
 IDCANCEL & OK
@@ -4443,7 +4447,7 @@ CMD_VPNCMD_HOST_2 연결된 VPN Client를 실행하는 컴퓨터의 IP 주소 �
 CMD_VPNCMD_HOST_3 연결된 호스트 이름 또는 IP 주소:
 CMD_VPNCMD_HUB_1 서버에 가상 HUB 관리 모드로 접속하는 경우에는 가상 HUB 이름을 입력하십시오. \n 서버 관리 모드로 접속하는 경우는 아무것도 입력하지 않고 Enter를 누르십시오.
 CMD_VPNCMD_HUB_2 연결된 가상 HUB 이름을 입력:
-CMD_VPNCMD_ABOUT SoftEther VPN 명령 줄 관리 유틸리티 (vpncmd 명령) \n %S \n %S \nCopyright (c) SoftEther VPN Project. All Rights Reserved. \n
+CMD_VPNCMD_ABOUT SoftEther VPN 명령 줄 관리 유틸리티 (vpncmd 명령)\nDeveloper Edition\n%S\n%S\nCopyright (c) all contributors on SoftEther VPN project in GitHub.\nCopyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.\nAll rights reserved.\n
 CMD_VPNCMD_PASSWORD_1 액세스가 거부되었습니다. 암호가 잘못되었거나 연결 관리 모드가 정확하지 않을 수 있습니다. 암호를 다시 입력 할 수 있습니다. 취소하려면 Ctrl + D를 누르십시오.
 CMD_VPNCMD_PASSWORD_2 비밀번호:
 CMD_VPNCMD_ERROR 오류가 발생했습니다. (오류 코드:%u) \n %s
@@ -7060,7 +7064,7 @@ CMD_Check_Args Check
 
 # 시스템 검사기 관계
 # (일부 이상한 문자열이 포함되어 있지만 문자 코드 변환 확인 용입니다)
-CHECK_TITLE -------------------------------------------------- \nSoftEther VPN 동작 환경 검사 도구 \n \nCopyright (c) SoftEther VPN Project \nAll Rights Reserved. \n \n
+CHECK_TITLE -------------------------------------------------- \nSoftEther VPN 동작 환경 검사 도구 \n\nCopyright (c) all contributors on SoftEther VPN project in GitHub.\nCopyright (c) Daiyuu Nobori, SoftEther Project at University of Tsukuba, and SoftEther Corporation.\nAll Rights Reserved.\n\n
 CHECK_NOTE 이 작동 환경 검사 도구를 실행 한 시스템이 테스트를 통과 한 경우 SoftEther VPN 소프트웨어가 작동 할 가능성이 높습니다. 체크에 시간이 걸릴 수 있습니다. 기다리십시오... \n \n
 CHECK_EXEC_TAG '%s'의 체크 중... \n
 CHECK_PASS [합격] ○
@@ -7129,6 +7133,8 @@ SW_WEB2_TITLE 파일 지정
 
 SW_UNINSTALLINFO_URL http://selinks.org/
 SW_UNINSTALLINFO_PUBLISHER SoftEther VPN Project
+
+SW_KB3033929_REQUIRED						In Windows 7 and Windows Server 2008 R2, some SoftEther VPN functions require the Microsoft's Windows Update module KB3033929 installed.\r\n\r\nIf KB3033929 is not installed in your Windows, please install it from Windows Update or Microsoft website before installing SoftEther VPN.
 
 
 SW_COMPONENTS_ABOUT_TAG '%s'는

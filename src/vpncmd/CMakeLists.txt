@@ -19,11 +19,17 @@ if(WIN32)
   get_filename_component(COMPONENT_FILE_NAME vpncmd NAME)
   set(COMPONENT_FILE_NAME "${COMPONENT_FILE_NAME}.exe")
 
-  configure_file("${TOP_DIRECTORY}/src/BuildFiles/VerScript/ver.rc" "${CMAKE_BINARY_DIR}/VerScript/vpncmd.rc")
-  target_sources(vpncmd PRIVATE vpncmd.rc "${CMAKE_BINARY_DIR}/VerScript/vpncmd.rc")
+  configure_file("${TOP_DIRECTORY}/src/BuildFiles/VerScript/ver.rc" "${CMAKE_CURRENT_BINARY_DIR}/ver.rc")
+
+  target_sources(vpncmd PRIVATE
+    "vpncmd.rc"
+    "ver.rc"
+
+    "${TOP_DIRECTORY}/src/BuildFiles/Manifests/common.manifest"
+  )
 endif()
 
-target_link_libraries(vpncmd cedar mayaqua)
+target_link_libraries(vpncmd cedar)
 
 if(UNIX)
   # Copy binary and "hamcore.se2" to /usr/lib(exec)/softether/, install launch script
@@ -39,5 +45,5 @@ if(UNIX)
     PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
-  install_wrapper_script("vpncmd" "${CMAKE_INSTALL_FULL_LIBEXECDIR}/softether/vpncmd/vpncmd")
+  install_wrapper_script("vpncmd")
 endif()

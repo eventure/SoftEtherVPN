@@ -5,7 +5,21 @@
 // DDNS.c
 // Dynamic DNS Client
 
-#include "CedarPch.h"
+#include "DDNS.h"
+
+#include "AzureClient.h"
+#include "Server.h"
+#include "Virtual.h"
+
+#include "Mayaqua/Internat.h"
+#include "Mayaqua/Mayaqua.h"
+#include "Mayaqua/Memory.h"
+#include "Mayaqua/Microsoft.h"
+#include "Mayaqua/Object.h"
+#include "Mayaqua/Pack.h"
+#include "Mayaqua/Str.h"
+#include "Mayaqua/Table.h"
+#include "Mayaqua/Tick64.h"
 
 // Get the current status of the DDNS client
 void DCGetStatus(DDNS_CLIENT *c, DDNS_CLIENT_STATUS *st)
@@ -527,12 +541,8 @@ UINT DCRegister(DDNS_CLIENT *c, bool ipv6, DDNS_REGISTER_PARAM *p, char *replace
 		}
 	}
 
-
-
 	Format(url2, sizeof(url2), "%s?v=%I64u", url, Rand64());
 	Format(url3, sizeof(url3), url2, key_hash_str[2], key_hash_str[3]);
-
-	ReplaceStr(url3, sizeof(url3), url3, "https://", "http://");
 
 	ReplaceStr(url3, sizeof(url3), url3, ".servers", ".open.servers");
 

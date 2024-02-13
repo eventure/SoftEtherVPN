@@ -339,6 +339,8 @@
 #define C_NUM_TCP                       1075
 #define B_TRUST                         1076
 #define E_INTERVAL                      1076
+#define E_BIND_LOCALIP                  9076	// Bind source IP address
+#define E_BIND_LOCALPORT                9077	// Bind source port number
 #define B_PROXY_CONFIG                  1077
 #define B_SERVER_CERT                   1078
 #define B_VIEW_SERVER_CERT              1079
@@ -396,7 +398,6 @@
 #define B_IPSEC                         1096
 #define S_INFO                          1097
 #define B_OPENVPN                       1097
-#define B_DEFAULT                       1097
 #define S_PORT                          1098
 #define B_BRIDGE2                       1098
 #define B_DDNS                          1098
@@ -960,7 +961,7 @@
 #define S_WIN8                          1457
 #define R_OPENVPN                       1458
 #define S_UDP                           1459
-#define S_UDP2                          1460
+#define B_APPLY                         1460
 #define S_TOOL                          1461
 #define S_TOOL2                         1462
 #define R_SSTP                          1463
@@ -1029,6 +1030,7 @@
 #define L_VALUES_LIST                   1519
 #define B_HTTP_HEADER                   1520
 #define B_NEW                           1521
+#define R_TRUST_DEFAULT                 1521
 #define B_CLEAR                         1522
 #define B_ONLINE                        1655
 #define D_NM_CONNECT                    1998
@@ -1213,7 +1215,7 @@
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        244
 #define _APS_NEXT_COMMAND_VALUE         40111
-#define _APS_NEXT_CONTROL_VALUE         1521
+#define _APS_NEXT_CONTROL_VALUE         1522
 #define _APS_NEXT_SYMED_VALUE           102
 #endif
 #endif

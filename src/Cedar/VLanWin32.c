@@ -5,22 +5,22 @@
 // VLanWin32.c
 // Virtual device driver library for Win32
 
-#include <GlobalConst.h>
+#ifdef OS_WIN32
 
-#ifdef	VLAN_C
+#include "VLanWin32.h"
 
-#include <windows.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <wchar.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
-#include <Mayaqua/Mayaqua.h>
-#include <Cedar/Cedar.h>
+#include "Admin.h"
+#include "Connection.h"
+#include "UdpAccel.h"
 
-#ifdef	OS_WIN32
+#include "Mayaqua/Memory.h"
+#include "Mayaqua/Microsoft.h"
+#include "Mayaqua/Object.h"
+#include "Mayaqua/Str.h"
+#include "Mayaqua/Tick64.h"
+#include "Mayaqua/Win32.h"
+
+#include "Neo/Neo.h"
 
 typedef DWORD(CALLBACK* OPENVXDHANDLE)(HANDLE);
 
@@ -37,26 +37,8 @@ void Win32GetWinVer(RPC_WINVER *v)
 
 	v->IsWindows = true;
 
-	if (OS_IS_WINDOWS_NT(GetOsType()) == false)
+	if (true)
 	{
-		// Windows 9x
-		OSVERSIONINFO os;
-		Zero(&os, sizeof(os));
-		os.dwOSVersionInfoSize = sizeof(os);
-		GetVersionEx(&os);
-
-		v->Build = LOWORD(os.dwBuildNumber);
-		v->VerMajor = os.dwMajorVersion;
-		v->VerMinor = os.dwMinorVersion;
-
-		Format(v->Title, sizeof(v->Title), "%s %s",
-			GetOsInfo()->OsProductName,
-			GetOsInfo()->OsVersion);
-		Trim(v->Title);
-	}
-	else
-	{
-		// Windows NT 4.0 SP6 or later
 		OSVERSIONINFOEX os;
 		Zero(&os, sizeof(os));
 		os.dwOSVersionInfoSize = sizeof(os);
@@ -91,31 +73,6 @@ void Win32GetWinVer(RPC_WINVER *v)
 			v->IsBeta = true;
 		}
 	}
-}
-
-// Release the DHCP addresses of all virtual LAN cards
-void Win32ReleaseAllDhcp9x(bool wait)
-{
-	TOKEN_LIST *t;
-	UINT i;
-
-	t = MsEnumNetworkAdapters(VLAN_ADAPTER_NAME, VLAN_ADAPTER_NAME_OLD);
-	if (t == NULL)
-	{
-		return;
-	}
-
-	for (i = 0;i < t->NumTokens;i++)
-	{
-		char *name = t->Token[i];
-		UINT id = GetInstanceId(name);
-		if (id != 0)
-		{
-			Win32ReleaseDhcp9x(id, wait);
-		}
-	}
-
-	FreeToken(t);
 }
 
 // Routing table tracking main
@@ -205,7 +162,6 @@ void RouteTrackingMain(SESSION *s)
 					char ip_str2[64];
 
 					Copy(&e->DestIP, &nat_t_ip, sizeof(IP));
-					e->Metric = e->OldIfMetric;
 
 					IPToStr(ip_str, sizeof(ip_str), &e->DestIP);
 					IPToStr(ip_str2, sizeof(ip_str2), &e->GatewayIP);
@@ -233,9 +189,12 @@ void RouteTrackingMain(SESSION *s)
 	{
 		UINT i;
 		bool route_to_server_erased = true;
-		bool is_vlan_want_to_be_default_gateway = false;
-		UINT vlan_default_gateway_metric = 0;
-		UINT other_if_default_gateway_metric_min = INFINITE;
+		bool is_vlan_want_to_be_default_gateway_v4 = false;
+		bool is_vlan_want_to_be_default_gateway_v6 = false;
+		UINT vlan_default_gateway_metric_v4 = 0;
+		UINT vlan_default_gateway_metric_v6 = 0;
+		UINT other_if_default_gateway_metric_min_v4 = INFINITE;
+		UINT other_if_default_gateway_metric_min_v6 = INFINITE;
 
 		// Get whether the routing table have been changed
 		if (t->LastRoutingTableHash != table->HashedValue)
@@ -267,59 +226,77 @@ void RouteTrackingMain(SESSION *s)
 			}
 
 			// Search for the default gateway
-			if (IPToUINT(&e->DestIP) == 0 &&
-				IPToUINT(&e->DestMask) == 0)
+			if (IsZeroIP(&e->DestIP) && IsZeroIP(&e->DestMask))
 			{
 				Debug("e->InterfaceID = %u, t->VLanInterfaceId = %u\n",
 					e->InterfaceID, t->VLanInterfaceId);
 
 				if (e->InterfaceID == t->VLanInterfaceId)
 				{
-					// The virtual LAN card think that he want to be a default gateway
-					is_vlan_want_to_be_default_gateway = true;
-					vlan_default_gateway_metric = e->Metric;
-
-					if (vlan_default_gateway_metric >= 2 &&
-						t->OldDefaultGatewayMetric == (vlan_default_gateway_metric - 1))
+					if (IsIP4(&e->DestIP))
 					{
-						// Restore because the PPP server rewrites
-						// the routing table selfishly
-						DeleteRouteEntry(e);
-						e->Metric--;
-						AddRouteEntry(e);
-						Debug("** Restore metric destroyed by PPP.\n");
+						// The virtual LAN card think that he want to be a default gateway
+						is_vlan_want_to_be_default_gateway_v4 = true;
+						vlan_default_gateway_metric_v4 = e->Metric;
 
-						any_modified = true;
+						// PPP route fix
+						if (vlan_default_gateway_metric_v4 >= 2 &&
+							t->OldDefaultGatewayMetric == (vlan_default_gateway_metric_v4 - 1))
+						{
+							// Restore because the PPP server rewrites
+							// the routing table selfishly
+							DeleteRouteEntry(e);
+							e->Metric--;
+							AddRouteEntry(e);
+							Debug("** Restore metric destroyed by PPP.\n");
+
+							any_modified = true;
+						}
+
+						// Keep this entry
+						if (t->DefaultGatewayByVLan != NULL)
+						{
+							// Delete if there is one added last time
+							FreeRouteEntry(t->DefaultGatewayByVLan);
+						}
+
+						t->DefaultGatewayByVLan = ZeroMalloc(sizeof(ROUTE_ENTRY));
+						Copy(t->DefaultGatewayByVLan, e, sizeof(ROUTE_ENTRY));
+
+						t->OldDefaultGatewayMetric = vlan_default_gateway_metric_v4;
 					}
-
-					// Keep this entry
-					if (t->DefaultGatewayByVLan != NULL)
+					else
 					{
-						// Delete if there is one added last time
-						FreeRouteEntry(t->DefaultGatewayByVLan);
+						is_vlan_want_to_be_default_gateway_v6 = true;
+						vlan_default_gateway_metric_v6 = e->Metric;
 					}
-
-					t->DefaultGatewayByVLan = ZeroMalloc(sizeof(ROUTE_ENTRY));
-					Copy(t->DefaultGatewayByVLan, e, sizeof(ROUTE_ENTRY));
-
-					t->OldDefaultGatewayMetric = vlan_default_gateway_metric;
 				}
 				else
 				{
-					// There are default gateway other than the virtual LAN card
-					// Save the metric value of the default gateway
-					if (other_if_default_gateway_metric_min > e->Metric)
+					if (IsIP4(&e->DestIP))
 					{
-						// Ignore the metric value of all PPP connection in the case of Windows Vista
-						if (MsIsVista() == false || e->PPPConnection == false)
+						// There are default gateway other than the virtual LAN card
+						// Save the metric value of the default gateway
+						if (other_if_default_gateway_metric_min_v4 > e->Metric)
 						{
-							other_if_default_gateway_metric_min = e->Metric;
+							// Ignore the metric value of all PPP connection in the case of Windows Vista
+							if (e->PPPConnection == false)
+							{
+								other_if_default_gateway_metric_min_v4 = e->Metric;
+							}
+							else
+							{
+								// a PPP is used to Connect to the network
+								// in using Windows Vista
+								t->VistaAndUsingPPP = true;
+							}
 						}
-						else
+					}
+					else
+					{
+						if (other_if_default_gateway_metric_min_v6 > e->Metric)
 						{
-							// a PPP is used to Connect to the network
-							// in using Windows Vista
-							t->VistaAndUsingPPP = true;
+							other_if_default_gateway_metric_min_v6 = e->Metric;
 						}
 					}
 				}
@@ -330,7 +307,7 @@ void RouteTrackingMain(SESSION *s)
 		{
 			if (t->DefaultGatewayByVLan != NULL)
 			{
-				if (is_vlan_want_to_be_default_gateway)
+				if (is_vlan_want_to_be_default_gateway_v4)
 				{
 					if (t->VistaOldDefaultGatewayByVLan == NULL || Cmp(t->VistaOldDefaultGatewayByVLan, t->DefaultGatewayByVLan, sizeof(ROUTE_ENTRY)) != 0)
 					{
@@ -405,8 +382,9 @@ void RouteTrackingMain(SESSION *s)
 		// to elect the virtual LAN card as the default gateway
 //		Debug("is_vlan_want_to_be_default_gateway = %u, rs = %u, route_to_server_erased = %u, other_if_default_gateway_metric_min = %u, vlan_default_gateway_metric = %u\n",
 //			is_vlan_want_to_be_default_gateway, rs, route_to_server_erased, other_if_default_gateway_metric_min, vlan_default_gateway_metric);
-		if (is_vlan_want_to_be_default_gateway && (rs != NULL && route_to_server_erased == false) &&
-			other_if_default_gateway_metric_min >= vlan_default_gateway_metric)
+		if ((is_vlan_want_to_be_default_gateway_v4 && other_if_default_gateway_metric_min_v4 >= vlan_default_gateway_metric_v4 ||
+			is_vlan_want_to_be_default_gateway_v6 && other_if_default_gateway_metric_min_v6 >= vlan_default_gateway_metric_v6)
+			&& rs != NULL && route_to_server_erased == false)
 		{
 			// Scan the routing table again
 			for (i = 0;i < table->NumEntry;i++)
@@ -415,8 +393,7 @@ void RouteTrackingMain(SESSION *s)
 
 				if (e->InterfaceID != t->VLanInterfaceId)
 				{
-					if (IPToUINT(&e->DestIP) == 0 &&
-					IPToUINT(&e->DestMask) == 0)
+					if (IsZeroIP(&e->DestIP) && IsZeroIP(&e->DestMask))
 					{
 						char str[64];
 						// Default gateway is found
@@ -513,12 +490,9 @@ void RouteTrackingStart(SESSION *s)
 	if_id = GetInstanceId(v->InstanceName);
 	Debug("[InstanceId of %s] = 0x%x\n", v->InstanceName, if_id);
 
-	if (MsIsVista())
-	{
-		// The routing table by the virtual LAN card body should be
-		// excluded explicitly in Windows Vista
-		exclude_if_id = if_id;
-	}
+	// The routing table by the virtual LAN card body should be
+	// excluded explicitly in Windows Vista
+	exclude_if_id = if_id;
 
 	// Get the route to the server
 	e = GetBestRouteEntryEx(&s->ServerIP, exclude_if_id);
@@ -532,10 +506,6 @@ void RouteTrackingStart(SESSION *s)
 	Debug("GetBestRouteEntry() Succeed. [Gateway: %s]\n", tmp);
 
 	// Add a route
-	if (MsIsVista())
-	{
-		e->Metric = e->OldIfMetric;
-	}
 	if (AddRouteEntryEx(e, &already_exists) == false)
 	{
 		FreeRouteEntry(e);
@@ -597,15 +567,10 @@ void RouteTrackingStart(SESSION *s)
 			else
 			{
 				// Add a route
-				if (MsIsVista())
+				if (AddRouteEntry(dns) == false)
 				{
-					dns->Metric = dns->OldIfMetric;
-
-					if (AddRouteEntry(dns) == false)
-					{
-						FreeRouteEntry(dns);
-						dns = NULL;
-					}
+					FreeRouteEntry(dns);
+					dns = NULL;
 				}
 			}
 		}
@@ -620,11 +585,6 @@ void RouteTrackingStart(SESSION *s)
 
 			if (route_to_real_server_global != NULL)
 			{
-				if (MsIsVista())
-				{
-					route_to_real_server_global->Metric = route_to_real_server_global->OldIfMetric;
-				}
-
 				if (AddRouteEntry(route_to_real_server_global) == false)
 				{
 					FreeRouteEntry(route_to_real_server_global);
@@ -687,11 +647,6 @@ void RouteTrackingStart(SESSION *s)
 			MsFreeAdapter(a);
 		}
 	}
-	else
-	{
-		// For Win9x
-		Win32RenewDhcp9x(if_id);
-	}
 
 	// Clear the DNS cache
 	Win32FlushDnsCache();
@@ -717,21 +672,6 @@ void RouteTrackingStop(SESSION *s, ROUTE_TRACKING *t)
 
 	Zero(&dns_ip, sizeof(dns_ip));
 
-	// Remove the default gateway added by the virtual LAN card
-	if (MsIsVista() == false)
-	{
-		if (t->DefaultGatewayByVLan != NULL)
-		{
-			Debug("Default Gateway by VLAN was deleted.\n");
-			DeleteRouteEntry(t->DefaultGatewayByVLan);
-		}
-
-		if (t->VistaOldDefaultGatewayByVLan != NULL)
-		{
-			FreeRouteEntry(t->VistaOldDefaultGatewayByVLan);
-		}
-	}
-
 	if (t->DefaultGatewayByVLan != NULL)
 	{
 		FreeRouteEntry(t->DefaultGatewayByVLan);
@@ -746,12 +686,6 @@ void RouteTrackingStop(SESSION *s, ROUTE_TRACKING *t)
 
 		DeleteRouteEntry(t->VistaDefaultGateway2);
 		FreeRouteEntry(t->VistaDefaultGateway2);
-	}
-
-	if (MsIsNt() == false)
-	{
-		// Only in the case of Windows 9x, release the DHCP address of the virtual LAN card
-		Win32ReleaseDhcp9x(t->VLanInterfaceId, false);
 	}
 
 	// Clear the DNS cache
@@ -857,12 +791,12 @@ void RouteTrackingStop(SESSION *s, ROUTE_TRACKING *t)
 		// If the restoring routing entry is a default gateway and
 		// the existing routing table contains another default gateway
 		// on the interface, give up restoring the entry
-		if (IPToUINT(&e->DestIP) == 0 && IPToUINT(&e->DestMask) == 0)
+		if (IsZeroIP(&e->DestIP) && IsZeroIP(&e->DestMask))
 		{
 			for (i = 0;i < table->NumEntry;i++)
 			{
 				ROUTE_ENTRY *r = table->Entry[i];
-				if (IPToUINT(&r->DestIP) == 0 && IPToUINT(&r->DestMask) == 0)
+				if (IsZeroIP(&r->DestIP) && IsZeroIP(&r->DestMask))
 				{
 					if (r->InterfaceID == e->InterfaceID)
 					{
@@ -1130,11 +1064,8 @@ bool VLanPaInit(SESSION *s)
 	// Normalize the setting of interface metric of the default gateway
 	if (s->ClientModeAndUseVLan)
 	{
-		if (MsIsVista())
-		{
-			MsNormalizeInterfaceDefaultGatewaySettings(VLAN_ADAPTER_NAME_TAG, s->ClientOption->DeviceName);
-			MsNormalizeInterfaceDefaultGatewaySettings(VLAN_ADAPTER_NAME_TAG_OLD, s->ClientOption->DeviceName);
-		}
+		MsNormalizeInterfaceDefaultGatewaySettings(VLAN_ADAPTER_NAME_TAG, s->ClientOption->DeviceName);
+		MsNormalizeInterfaceDefaultGatewaySettings(VLAN_ADAPTER_NAME_TAG_OLD, s->ClientOption->DeviceName);
 	}
 
 	// Connect to the driver
@@ -1288,33 +1219,19 @@ bool VLanPutPacketsToDriver(VLAN *v)
 		return false;
 	}
 
-	if (v->Win9xMode == false)
+	PROBE_STR("VLanPutPacketsToDriver: WriteFile");
+	if (WriteFile(v->Handle, v->PutBuffer, NEO_EXCHANGE_BUFFER_SIZE, &write_size,
+		NULL) == false)
 	{
-		// Windows NT
-		PROBE_STR("VLanPutPacketsToDriver: WriteFile");
-		if (WriteFile(v->Handle, v->PutBuffer, NEO_EXCHANGE_BUFFER_SIZE, &write_size,
-			NULL) == false)
-		{
-			v->Halt = true;
-			return false;
-		}
-		PROBE_STR("VLanPutPacketsToDriver: WriteFile Completed.");
-
-		if (write_size != NEO_EXCHANGE_BUFFER_SIZE)
-		{
-			v->Halt = true;
-			return false;
-		}
+		v->Halt = true;
+		return false;
 	}
-	else
+	PROBE_STR("VLanPutPacketsToDriver: WriteFile Completed.");
+
+	if (write_size != NEO_EXCHANGE_BUFFER_SIZE)
 	{
-		// Windows 9x
-		if (DeviceIoControl(v->Handle, NEO_IOCTL_PUT_PACKET, v->PutBuffer,
-			NEO_EXCHANGE_BUFFER_SIZE, NULL, 0, &write_size, NULL) == false)
-		{
-			v->Halt = true;
-			return false;
-		}
+		v->Halt = true;
+		return false;
 	}
 
 	return true;
@@ -1334,26 +1251,12 @@ bool VLanGetPacketsFromDriver(VLAN *v)
 		return false;
 	}
 
-	if (v->Win9xMode == false)
+	PROBE_STR("VLanGetPacketsFromDriver: ReadFile");
+	if (ReadFile(v->Handle, v->GetBuffer, NEO_EXCHANGE_BUFFER_SIZE,
+		&read_size, NULL) == false)
 	{
-		// Windows NT
-		PROBE_STR("VLanGetPacketsFromDriver: ReadFile");
-		if (ReadFile(v->Handle, v->GetBuffer, NEO_EXCHANGE_BUFFER_SIZE,
-			&read_size, NULL) == false)
-		{
-			v->Halt = true;
-			return false;
-		}
-	}
-	else
-	{
-		// Windows 9x
-		if (DeviceIoControl(v->Handle, NEO_IOCTL_GET_PACKET, NULL, 0,
-			v->GetBuffer, NEO_EXCHANGE_BUFFER_SIZE, &read_size, NULL) == false)
-		{
-			v->Halt = true;
-			return false;
-		}
+		v->Halt = true;
+		return false;
 	}
 
 	if (read_size != NEO_EXCHANGE_BUFFER_SIZE)
@@ -1423,23 +1326,14 @@ VLAN *NewVLan(char *instance_name, VLAN_PARAM *param)
 
 	v = ZeroMalloc(sizeof(VLAN));
 
-	if (OS_IS_WINDOWS_9X(GetOsInfo()->OsType))
-	{
-		v->Win9xMode = true;
-	}
-
 	// Initialize the name
 	Format(name_upper, sizeof(name_upper), "%s", instance_name);
 	StrUpper(name_upper);
 	v->InstanceName = CopyStr(name_upper);
 	Format(tmp, sizeof(tmp), NDIS_NEO_DEVICE_FILE_NAME, v->InstanceName);
 	v->DeviceNameWin32 = CopyStr(tmp);
-
-	if (v->Win9xMode == false)
-	{
-		Format(tmp, sizeof(tmp), NDIS_NEO_EVENT_NAME_WIN32, v->InstanceName);
-		v->EventNameWin32 = CopyStr(tmp);
-	}
+	Format(tmp, sizeof(tmp), NDIS_NEO_EVENT_NAME_WIN32, v->InstanceName);
+	v->EventNameWin32 = CopyStr(tmp);
 
 	// Connect to the device
 	h = CreateFile(v->DeviceNameWin32,
@@ -1455,31 +1349,12 @@ VLAN *NewVLan(char *instance_name, VLAN_PARAM *param)
 		goto CLEANUP;
 	}
 
-	if (v->Win9xMode == false)
+	// Connect to the event
+	e = OpenEvent(SYNCHRONIZE, FALSE, v->EventNameWin32);
+	if (e == INVALID_HANDLE_VALUE)
 	{
-		// Connect to the event
-		e = OpenEvent(SYNCHRONIZE, FALSE, v->EventNameWin32);
-		if (e == INVALID_HANDLE_VALUE)
-		{
-			// Connection failure
-			goto CLEANUP;
-		}
-	}
-	else
-	{
-		OPENVXDHANDLE OpenVxDHandle;
-		DWORD vxd_handle;
-		UINT bytes_returned;
-
-		OpenVxDHandle = (OPENVXDHANDLE)GetProcAddress(GetModuleHandle("KERNEL32"),
-			"OpenVxDHandle");
-
-		// Deliver to the driver by creating an event
-		e = CreateEvent(NULL, FALSE, FALSE, NULL);
-		vxd_handle = (DWORD)OpenVxDHandle(e);
-
-		DeviceIoControl(h, NEO_IOCTL_SET_EVENT, &vxd_handle, sizeof(DWORD),
-			NULL, 0, &bytes_returned, NULL);
+		// Connection failure
+		goto CLEANUP;
 	}
 
 	v->Event = e;
@@ -1508,7 +1383,4 @@ CLEANUP:
 	return NULL;
 }
 
-#endif	// OS_WIN32
-
-#endif	//VLAN_C
-
+#endif

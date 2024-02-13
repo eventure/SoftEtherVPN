@@ -5,45 +5,65 @@
 // Secure.c
 // Security token management module
 
-#include <GlobalConst.h>
+#include "Secure.h"
 
-#define	SECURE_C
-#define	ENCRYPT_C
+#include "Encrypt.h"
+#include "GlobalConst.h"
+#include "Internat.h"
+#include "Kernel.h"
+#include "Memory.h"
+#include "Microsoft.h"
+#include "Object.h"
+#include "Str.h"
 
-#ifdef	WIN32
-#include <windows.h>
-#endif	// WIN32
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <wchar.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#include <openssl/rand.h>
-#include <openssl/engine.h>
-#include <openssl/bio.h>
-#include <openssl/x509.h>
-#include <openssl/pkcs7.h>
-#include <openssl/pkcs12.h>
-#include <openssl/rc4.h>
-#include <openssl/md5.h>
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 #include <openssl/rsa.h>
-#include <Mayaqua/Mayaqua.h>
-#include <Mayaqua/cryptoki.h>
 
+#include <cryptoki.h>
 
 #define	MAX_OBJ				1024		// Maximum number of objects in the hardware (assumed)
 
 #define	A_SIZE(a, i)		(a[(i)].ulValueLen)
 #define	A_SET(a, i, value, size)	(a[i].pValue = value;a[i].ulValueLen = size;)
 
+// Internal data structure
+// The list of supported secure devices
+static LIST *SecureDeviceList = NULL;
+
+// Supported hardware list
+const SECURE_DEVICE SupportedList[] =
+{
+	{1,		SECURE_IC_CARD,		"Standard-9 IC Card",	"Dai Nippon Printing",	"DNPS9P11.DLL"},
+	{2,		SECURE_USB_TOKEN,	"ePass 1000",			"Feitian Technologies",	"EP1PK111.DLL"},
+	{3,		SECURE_IC_CARD,		"DNP Felica",			"Dai Nippon Printing",	"DNPFP11.DLL"},
+	{4,		SECURE_USB_TOKEN,	"eToken",				"Aladdin",				"ETPKCS11.DLL"},
+	{5,		SECURE_IC_CARD,		"Standard-9 IC Card",	"Fujitsu",				"F3EZSCL2.DLL"},
+	{6,		SECURE_IC_CARD,		"ASECard",				"Athena",				"ASEPKCS.DLL"},
+	{7,		SECURE_IC_CARD,		"Gemplus IC Card",		"Gemplus",				"PK2PRIV.DLL"},
+	{8,		SECURE_IC_CARD,		"1-Wire & iButton",		"DALLAS SEMICONDUCTOR",	"DSPKCS.DLL"},
+	{9,		SECURE_IC_CARD,		"JPKI IC Card",			"Japanese Government",	"JPKIPKCS11.DLL"},
+	{10,	SECURE_IC_CARD,		"LGWAN IC Card",		"Japanese Government",	"P11STD9.DLL"},
+	{11,	SECURE_IC_CARD,		"LGWAN IC Card",		"Japanese Government",	"P11STD9A.DLL"},
+	{12,	SECURE_USB_TOKEN,	"iKey 1000",			"Rainbow Technologies",	"K1PK112.DLL"},
+	{13,	SECURE_IC_CARD,		"JPKI IC Card #2",		"Japanese Government",	"libmusclepkcs11.dll"},
+	{14,	SECURE_USB_TOKEN,	"SafeSign",				"A.E.T.",				"aetpkss1.dll"},
+	{15,	SECURE_USB_TOKEN,	"LOCK STAR-PKI",		"Logicaltech Co.,LTD",	"LTPKCS11.dll"},
+	{16,	SECURE_USB_TOKEN,	"ePass 2000",			"Feitian Technologies",	"ep2pk11.dll"},
+	{17,	SECURE_IC_CARD,		"myuToken",				"iCanal Inc.",			"icardmodpk.dll"},
+	{18,	SECURE_IC_CARD,		"Gemalto .NET",			"Gemalto",				"gtop11dotnet.dll"},
+	{19,	SECURE_IC_CARD,		"Gemalto .NET 64bit",	"Gemalto",				"gtop11dotnet64.dll"},
+	{20,	SECURE_USB_TOKEN,	"ePass 2003",			"Feitian Technologies",	"eps2003csp11.dll"},
+	{21,	SECURE_USB_TOKEN,	"ePass 1000ND/2000/3000",			"Feitian Technologies",	"ngp11v211.dll"},
+	{22,	SECURE_USB_TOKEN,	"CryptoID",				"Longmai Technology",	"cryptoide_pkcs11.dll"},
+	{23,	SECURE_USB_TOKEN,	"RuToken",				"Aktiv Co.",			"rtPKCS11.dll"},
+};
+
 #ifdef	OS_WIN32
-// Code for Win32
+// Win32 internal data
+typedef struct SEC_DATA_WIN32
+{
+	HINSTANCE hInst;
+} SEC_DATA_WIN32;
 
 // DLL reading for Win32
 HINSTANCE Win32SecureLoadLibraryEx(char *dllname, DWORD flags)
@@ -384,6 +404,28 @@ bool WriteSecKey(SECURE *sec, bool private_obj, char *name, K *k)
 	UCHAR modules[MAX_SIZE], pub[MAX_SIZE], pri[MAX_SIZE], prime1[MAX_SIZE], prime2[MAX_SIZE];
 	UCHAR exp1[MAX_SIZE], exp2[MAX_SIZE], coeff[MAX_SIZE];
 	const BIGNUM *n, *e, *d, *p, *q, *dmp1, *dmq1, *iqmp;
+
+	// Validate arguments
+	if (sec == NULL)
+	{
+		return false;
+	}
+	if (name == NULL || k == NULL || k->private_key == false)
+	{
+		sec->Error = SEC_ERROR_BAD_PARAMETER;
+		return false;
+	}
+	if (sec->SessionCreated == false)
+	{
+		sec->Error = SEC_ERROR_NO_SESSION;
+		return false;
+	}
+	if (sec->LoginFlag == false && private_obj)
+	{
+		sec->Error = SEC_ERROR_NOT_LOGIN;
+		return false;
+	}
+
 	CK_ATTRIBUTE a[] =
 	{
 		{CKA_MODULUS,			modules,		0},		// 0
@@ -409,27 +451,6 @@ bool WriteSecKey(SECURE *sec, bool private_obj, char *name, K *k)
 		{CKA_EXTRACTABLE,		&b_false,		sizeof(b_false)},
 		{CKA_MODIFIABLE,		&b_false,		sizeof(b_false)},
 	};
-
-	// Validate arguments
-	if (sec == NULL)
-	{
-		return false;
-	}
-	if (name == NULL || k == NULL || k->private_key == false)
-	{
-		sec->Error = SEC_ERROR_BAD_PARAMETER;
-		return false;
-	}
-	if (sec->SessionCreated == false)
-	{
-		sec->Error = SEC_ERROR_NO_SESSION;
-		return false;
-	}
-	if (sec->LoginFlag == false && private_obj)
-	{
-		sec->Error = SEC_ERROR_NOT_LOGIN;
-		return false;
-	}
 
 	// Numeric data generation
 	rsa = EVP_PKEY_get0_RSA(k->pkey);
@@ -620,22 +641,6 @@ bool WriteSecCert(SECURE *sec, bool private_obj, char *name, X *x)
 	UINT ret;
 	BUF *b;
 	UINT object;
-	CK_ATTRIBUTE a[] =
-	{
-		{CKA_SUBJECT,			subject,		0},			// 0
-		{CKA_ISSUER,			issuer,			0},			// 1
-		{CKA_SERIAL_NUMBER,		serial_number,	0},			// 2
-		{CKA_VALUE,				value,			0},			// 3
-		{CKA_CLASS,				&obj_class,		sizeof(obj_class)},
-		{CKA_TOKEN,				&b_true,		sizeof(b_true)},
-		{CKA_PRIVATE,			&b_private_obj,	sizeof(b_private_obj)},
-		{CKA_LABEL,				name,			StrLen(name)},
-		{CKA_CERTIFICATE_TYPE,	&cert_type,		sizeof(cert_type)},
-#if	0		// Don't use these because some tokens fail
-		{CKA_START_DATE,		&start_date,	sizeof(start_date)},
-		{CKA_END_DATE,			&end_date,		sizeof(end_date)},
-#endif
-	};
 	// Validate arguments
 	if (sec == NULL)
 	{
@@ -656,6 +661,23 @@ bool WriteSecCert(SECURE *sec, bool private_obj, char *name, X *x)
 		sec->Error = SEC_ERROR_NOT_LOGIN;
 		return false;
 	}
+
+	CK_ATTRIBUTE a[] =
+	{
+		{CKA_SUBJECT,			subject,		0},			// 0
+		{CKA_ISSUER,			issuer,			0},			// 1
+		{CKA_SERIAL_NUMBER,		serial_number,	0},			// 2
+		{CKA_VALUE,				value,			0},			// 3
+		{CKA_CLASS,				&obj_class,		sizeof(obj_class)},
+		{CKA_TOKEN,				&b_true,		sizeof(b_true)},
+		{CKA_PRIVATE,			&b_private_obj,	sizeof(b_private_obj)},
+		{CKA_LABEL,				name,			StrLen(name)},
+		{CKA_CERTIFICATE_TYPE,	&cert_type,		sizeof(cert_type)},
+#if	0		// Don't use these because some tokens fail
+		{CKA_START_DATE,		&start_date,	sizeof(start_date)},
+		{CKA_END_DATE,			&end_date,		sizeof(end_date)},
+#endif
+	};
 
 	// Copy the certificate to the buffer
 	b = XToBuf(x, false);
@@ -1293,14 +1315,6 @@ bool WriteSecData(SECURE *sec, bool private_obj, char *name, void *data, UINT si
 	UINT object_class = CKO_DATA;
 	CK_BBOOL b_true = true, b_false = false, b_private_obj = private_obj;
 	UINT object;
-	CK_ATTRIBUTE a[] =
-	{
-		{CKA_TOKEN,		&b_true,		sizeof(b_true)},
-		{CKA_CLASS,		&object_class,	sizeof(object_class)},
-		{CKA_PRIVATE,	&b_private_obj,	sizeof(b_private_obj)},
-		{CKA_LABEL,		name,			StrLen(name)},
-		{CKA_VALUE,		data,			size},
-	};
 	// Validate arguments
 	if (sec == NULL)
 	{
@@ -1326,6 +1340,15 @@ bool WriteSecData(SECURE *sec, bool private_obj, char *name, void *data, UINT si
 		sec->Error = SEC_ERROR_DATA_TOO_BIG;
 		return false;
 	}
+
+	CK_ATTRIBUTE a[] =
+	{
+		{CKA_TOKEN,		&b_true,		sizeof(b_true)},
+		{CKA_CLASS,		&object_class,	sizeof(object_class)},
+		{CKA_PRIVATE,	&b_private_obj,	sizeof(b_private_obj)},
+		{CKA_LABEL,		name,			StrLen(name)},
+		{CKA_VALUE,		data,			size},
+	};
 
 	// Delete any objects with the same name
 	if (CheckSecObject(sec, name, SEC_DATA))

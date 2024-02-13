@@ -1,23 +1,21 @@
 // SoftEther VPN Source Code - Developer Edition Master Branch
 // Mayaqua Kernel
-
+// © 2020 Nokia
 
 // Encrypt.c
 // Encryption and digital certification routine
 
-#include <GlobalConst.h>
+#include "Encrypt.h"
 
-#define	ENCRYPT_C
+#include "FileIO.h"
+#include "Internat.h"
+#include "Kernel.h"
+#include "Memory.h"
+#include "Object.h"
+#include "Str.h"
 
-#define	__WINCRYPT_H__
-
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <wchar.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
+
 #include <openssl/crypto.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -40,11 +38,14 @@
 #include <openssl/pem.h>
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
-#include <Mayaqua/Mayaqua.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/provider.h>
+#endif
 
 #ifdef _MSC_VER
 	#include <intrin.h> // For __cpuid()
 #else // _MSC_VER
+
 
 #ifndef SKIP_CPU_FEATURES
 	#include "cpu_features_macros.h"
@@ -63,9 +64,31 @@
 	#endif
 #endif // _MSC_VER
 
+// OpenSSL <1.1 Shims
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#	define EVP_PKEY_get0_RSA(obj) ((obj)->pkey.rsa)
+#	define EVP_PKEY_base_id(pkey) ((pkey)->type)
+#	define X509_get0_notBefore(x509) ((x509)->cert_info->validity->notBefore)
+#	define X509_get0_notAfter(x509) ((x509)->cert_info->validity->notAfter)
+#	define X509_get_serialNumber(x509) ((x509)->cert_info->serialNumber)
+#endif
+
+#ifndef EVP_CTRL_AEAD_GET_TAG
+#	define EVP_CTRL_AEAD_GET_TAG EVP_CTRL_GCM_GET_TAG
+#endif
+
+#ifndef EVP_CTRL_AEAD_SET_TAG
+#	define EVP_CTRL_AEAD_SET_TAG EVP_CTRL_GCM_SET_TAG
+#endif
+
 LOCK *openssl_lock = NULL;
 
 int ssl_clientcert_index = 0;
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+static OSSL_PROVIDER *ossl_provider_legacy = NULL;
+static OSSL_PROVIDER *ossl_provider_default = NULL;
+#endif
 
 LOCK **ssl_lock_obj = NULL;
 UINT ssl_lock_num;
@@ -294,7 +317,7 @@ MD *NewMdEx(char *name, bool hmac)
 		return m;
 	}
 
-	m->Md = (const struct evp_md_st *)EVP_get_digestbyname(name);
+	m->Md = EVP_get_digestbyname(name);
 	if (m->Md == NULL)
 	{
 		Debug("NewMdEx(): Algorithm %s not found by EVP_get_digestbyname().\n", m->Name);
@@ -302,7 +325,7 @@ MD *NewMdEx(char *name, bool hmac)
 		return NULL;
 	}
 
-	m->Size = EVP_MD_size((const EVP_MD *)m->Md);
+	m->Size = EVP_MD_size(m->Md);
 	m->IsHMac = hmac;
 
 	if (hmac)
@@ -340,7 +363,7 @@ bool SetMdKey(MD *md, void *key, UINT key_size)
 		return false;
 	}
 
-	if (HMAC_Init_ex(md->Ctx, key, key_size, (const EVP_MD *)md->Md, NULL) == false)
+	if (HMAC_Init_ex(md->Ctx, key, key_size, md->Md, NULL) == false)
 	{
 		Debug("SetMdKey(): HMAC_Init_ex() failed with error: %s\n", OpenSSL_Error());
 		return false;
@@ -689,7 +712,8 @@ UINT RsaPublicSize(K *k)
 // Hash a pointer to a 32-bit
 UINT HashPtrToUINT(void *p)
 {
-	UCHAR hash_data[MD5_SIZE];
+	UCHAR hash_data[SHA256_SIZE];
+	UCHAR hash_src[CANARY_RAND_SIZE + sizeof(void *)];
 	UINT ret;
 	// Validate arguments
 	if (p == NULL)
@@ -697,7 +721,11 @@ UINT HashPtrToUINT(void *p)
 		return 0;
 	}
 
-	Md5(hash_data, &p, sizeof(p));
+	Zero(hash_src, sizeof(hash_src));
+	Copy(hash_src + 0, GetCanaryRand(CANARY_RAND_ID_PTR_KEY_HASH), CANARY_RAND_SIZE);
+	Copy(hash_src + CANARY_RAND_SIZE, p, sizeof(void *));
+
+	Sha2_256(hash_data, hash_src, sizeof(hash_src));
 
 	Copy(&ret, hash_data, sizeof(ret));
 
@@ -1064,6 +1092,41 @@ X *CloneX(X *x)
 	return ret;
 }
 
+// Clone of certificate chain
+LIST *CloneXList(LIST *chain)
+{
+	BUF *b;
+	X *x;
+	LIST *ret;
+	// Validate arguments
+	if (chain == NULL)
+	{
+		return NULL;
+	}
+
+	ret = NewList(NULL);
+	LockList(chain);
+	{
+		UINT i;
+		for (i = 0;i < LIST_NUM(chain);i++)
+		{
+			x = LIST_DATA(chain, i);
+			b = XToBuf(x, false);
+			if (b == NULL)
+			{
+				continue;
+			}
+
+			x = BufToX(b, false);
+			Add(ret, x);
+			FreeBuf(b);
+		}
+	}
+	UnlockList(chain);
+
+	return ret;
+}
+
 // Generate a P12
 P12 *NewP12(X *x, K *k, char *password)
 {
@@ -1119,8 +1182,14 @@ bool IsEncryptedP12(P12 *p12)
 // Extract the X and the K from the P12
 bool ParseP12(P12 *p12, X **x, K **k, char *password)
 {
+	return ParseP12Ex(p12, x, k, NULL, password);
+}
+// Extract the X, the K and the chain from the P12
+bool ParseP12Ex(P12 *p12, X **x, K **k, LIST **cc, char *password)
+{
 	EVP_PKEY *pkey;
 	X509 *x509;
+	STACK_OF(X509) *sk = NULL;
 	// Validate arguments
 	if (p12 == NULL || x == NULL || k == NULL)
 	{
@@ -1150,9 +1219,9 @@ bool ParseP12(P12 *p12, X **x, K **k, char *password)
 	// Extraction
 	Lock(openssl_lock);
 	{
-		if (PKCS12_parse(p12->pkcs12, password, &pkey, &x509, NULL) == false)
+		if (PKCS12_parse(p12->pkcs12, password, &pkey, &x509, &sk) == false)
 		{
-			if (PKCS12_parse(p12->pkcs12, NULL, &pkey, &x509, NULL) == false)
+			if (PKCS12_parse(p12->pkcs12, NULL, &pkey, &x509, &sk) == false)
 			{
 				Unlock(openssl_lock);
 				return false;
@@ -1167,12 +1236,44 @@ bool ParseP12(P12 *p12, X **x, K **k, char *password)
 	if (*x == NULL)
 	{
 		FreePKey(pkey);
+		sk_X509_free(sk);
 		return false;
 	}
 
 	*k = ZeroMalloc(sizeof(K));
 	(*k)->private_key = true;
 	(*k)->pkey = pkey;
+
+	if (sk == NULL || cc == NULL)
+	{
+		if (cc != NULL)
+		{
+			*cc = NULL;
+		}
+		if (sk != NULL)
+		{
+			sk_X509_free(sk);
+		}
+		return true;
+	}
+
+	LIST *chain = NewList(NULL);
+	X *x1;
+	while (sk_X509_num(sk)) {
+		x509 = sk_X509_shift(sk);
+		x1 = X509ToX(x509);
+		if (x1 != NULL)
+		{
+			Add(chain, x1);
+		}
+		else
+		{
+			X509_free(x509);
+		}
+	}
+	sk_X509_free(sk);
+
+	*cc = chain;
 
 	return true;
 }
@@ -3111,6 +3212,26 @@ bool IsEncryptedK(BUF *b, bool private_key)
 	return true;
 }
 
+K *OpensslEngineToK(char *key_file_name, char *engine_name)
+{
+#ifndef OPENSSL_NO_ENGINE
+    K *k;
+#if OPENSSL_API_COMPAT < 0x10100000L
+    ENGINE_load_dynamic();
+#endif	// OPENSSL_API_COMPAT < 0x10100000L
+    ENGINE *engine = ENGINE_by_id(engine_name);
+    ENGINE_init(engine);
+    EVP_PKEY *pkey;
+    pkey = ENGINE_load_private_key(engine, key_file_name, NULL, NULL);
+   	k = ZeroMalloc(sizeof(K));
+    k->pkey = pkey;
+    k->private_key = true;
+    return k;
+#else
+    return NULL;
+#endif
+}
+
 // Convert the BUF to a K
 K *BufToK(BUF *b, bool private_key, bool text, char *password)
 {
@@ -3334,6 +3455,29 @@ void FreeX(X *x)
 	Free(x);
 }
 
+// Release of an X chain
+void FreeXList(LIST *chain)
+{
+	// Validate arguments
+	if (chain == NULL)
+	{
+		return;
+	}
+
+	LockList(chain);
+	{
+		UINT i;
+		for (i = 0; i < LIST_NUM(chain); i++)
+		{
+			X *x = LIST_DATA(chain, i);
+			FreeX(x);
+		}
+	}
+	UnlockList(chain);
+
+	ReleaseList(chain);
+}
+
 // Release of the X509
 void FreeX509(X509 *x509)
 {
@@ -3373,6 +3517,31 @@ X *BufToX(BUF *b, bool text)
 	FreeBio(bio);
 
 	return x;
+}
+
+// Convert the BUF to X chain
+LIST *BufToXList(BUF *b, bool text)
+{
+	LIST *chain;
+	BIO *bio;
+	// Validate arguments
+	if (b == NULL)
+	{
+		return NULL;
+	}
+
+	bio = BufToBio(b);
+	if (bio == NULL)
+	{
+		FreeBuf(b);
+		return NULL;
+	}
+
+	chain = BioToXList(bio, text);
+
+	FreeBio(bio);
+
+	return chain;
 }
 
 // Get a digest of the X
@@ -3436,6 +3605,49 @@ X *BioToX(BIO *bio, bool text)
 	}
 
 	return x;
+}
+
+// Convert BIO to X chain
+LIST *BioToXList(BIO *bio, bool text)
+{
+	X *x;
+	STACK_OF(X509_INFO) *sk = NULL;
+	X509_INFO *xi;
+	LIST *chain;
+
+	// Validate arguments
+	if (bio == NULL || text == false)
+	{
+		return NULL;
+	}
+
+	Lock(openssl_lock);
+	{
+		sk = PEM_X509_INFO_read_bio(bio, NULL, NULL, NULL);
+		if (sk == NULL)
+		{
+			return NULL;
+		}
+
+		chain = NewList(NULL);
+
+		while (sk_X509_INFO_num(sk))
+		{
+			xi = sk_X509_INFO_shift(sk);
+			x = X509ToX(xi->x509);
+			if (x != NULL)
+			{
+				Add(chain, x);
+				xi->x509 = NULL;
+			}
+			X509_INFO_free(xi);
+		}
+
+		sk_X509_INFO_free(sk);
+	}
+	Unlock(openssl_lock);
+
+	return chain;
 }
 
 // Convert the X509 to X
@@ -3749,6 +3961,20 @@ void FreeCryptLibrary()
 	SSL_COMP_free_compression_methods();
 #endif
 #endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+	if (ossl_provider_default != NULL)
+	{
+		OSSL_PROVIDER_unload(ossl_provider_default);
+		ossl_provider_default = NULL;
+	}
+
+	if (ossl_provider_legacy != NULL)
+	{
+		OSSL_PROVIDER_unload(ossl_provider_legacy);
+		ossl_provider_legacy = NULL;
+	}
+#endif
 }
 
 // Initialize the Crypt library
@@ -3765,6 +3991,11 @@ void InitCryptLibrary()
 	OpenSSL_add_all_digests();
 	ERR_load_crypto_strings();
 	SSL_load_error_strings();
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+	ossl_provider_default = OSSL_PROVIDER_load(NULL, "legacy");
+	ossl_provider_legacy = OSSL_PROVIDER_load(NULL, "default");
 #endif
 
 	ssl_clientcert_index = SSL_get_ex_new_index(0, "struct SslClientCertInfo *", NULL, NULL, NULL);
@@ -3841,7 +4072,7 @@ CRYPT *NewCrypt(void *key, UINT size)
 {
 	CRYPT *c = ZeroMalloc(sizeof(CRYPT));
 
-	c->Rc4Key = Malloc(sizeof(struct rc4_key_st));
+	c->Rc4Key = Malloc(sizeof(RC4_KEY));
 
 	RC4_set_key(c->Rc4Key, size, (UCHAR *)key);
 
@@ -4022,8 +4253,8 @@ AES_KEY_VALUE *AesNewKey(void *data, UINT size)
 
 	k = ZeroMalloc(sizeof(AES_KEY_VALUE));
 
-	k->EncryptKey = ZeroMalloc(sizeof(struct aes_key_st));
-	k->DecryptKey = ZeroMalloc(sizeof(struct aes_key_st));
+	k->EncryptKey = ZeroMalloc(sizeof(AES_KEY));
+	k->DecryptKey = ZeroMalloc(sizeof(AES_KEY));
 
 	k->KeySize = size;
 	Copy(k->KeyValue, data, size);

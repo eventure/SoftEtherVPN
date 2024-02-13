@@ -5,7 +5,25 @@
 // AzureClient.c
 // VPN Azure Client
 
-#include "CedarPch.h"
+#include "AzureClient.h"
+
+#include "Cedar.h"
+#include "Command.h"
+#include "Logging.h"
+#include "Wpc.h"
+
+#include "Mayaqua/Encrypt.h"
+#include "Mayaqua/Mayaqua.h"
+#include "Mayaqua/MayaType.h"
+#include "Mayaqua/Memory.h"
+#include "Mayaqua/Network.h"
+#include "Mayaqua/Object.h"
+#include "Mayaqua/Pack.h"
+#include "Mayaqua/Str.h"
+#include "Mayaqua/Table.h"
+#include "Mayaqua/Tick64.h"
+
+#include <stdlib.h>
 
 // Wait for connection request
 void AcWaitForRequest(AZURE_CLIENT *ac, SOCK *s, AZURE_PARAM *param)
@@ -64,6 +82,9 @@ void AcWaitForRequest(AZURE_CLIENT *ac, SOCK *s, AZURE_PARAM *param)
 						{
 							SOCK *ns;
 							Debug("Connect Request from %r:%u\n", &client_ip, client_port);
+							char ipstr[128];
+							IPToStr(ipstr, sizeof(ipstr), &client_ip);
+							SLog(ac->Cedar, "LS_AZURE_START", ipstr, client_port);
 
 							// Create new socket and connect VPN Azure Server
 							if (ac->DDnsStatusCopy.InternetSetting.ProxyType == PROXY_DIRECT)
@@ -87,7 +108,10 @@ void AcWaitForRequest(AZURE_CLIENT *ac, SOCK *s, AZURE_PARAM *param)
 
 								SetTimeout(ns, param->DataTimeout);
 
-								if (StartSSLEx(ns, NULL, NULL, 0, NULL))
+								UINT ssl_err = 0;
+								Copy(&ns->SslAcceptSettings, &ac->Cedar->SslAcceptSettings, sizeof(SSL_ACCEPT_SETTINGS));
+
+								if (StartSSLEx3(ns, NULL, NULL, NULL, 0, NULL, NULL, &ssl_err))
 								{
 									// Check certification
 									char server_cert_hash_str[MAX_SIZE];
@@ -139,6 +163,13 @@ void AcWaitForRequest(AZURE_CLIENT *ac, SOCK *s, AZURE_PARAM *param)
 
 											FreePack(p2);
 										}
+									}
+								}
+								else
+								{
+									if (ssl_err != 0)
+									{
+										SLog(ac->Cedar, "LS_AZURE_SSL_ERROR", GetUniErrorStr(ssl_err), ssl_err);
 									}
 								}
 

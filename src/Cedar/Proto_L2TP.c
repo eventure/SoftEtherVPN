@@ -5,7 +5,20 @@
 // Proto_L2TP.c
 // L2TP protocol stack
 
-#include "CedarPch.h"
+#include "Proto_L2TP.h"
+
+#include "Connection.h"
+#include "Logging.h"
+#include "Proto_EtherIP.h"
+#include "Proto_IKE.h"
+#include "Proto_IPsec.h"
+#include "Proto_PPP.h"
+
+#include "Mayaqua/Memory.h"
+#include "Mayaqua/Network.h"
+#include "Mayaqua/Object.h"
+#include "Mayaqua/Str.h"
+#include "Mayaqua/TcpIp.h"
 
 // Release the L2TP AVP value
 void FreeL2TPAVP(L2TP_AVP *a)
@@ -1780,7 +1793,7 @@ void ProcL2TPPacketRecv(L2TP_SERVER *l2tp, UDPPACKET *p)
 							Insert(t->RecvQueue, q);
 
 							// Read to the end of completed part from the head of the queue
-							while (TRUE)
+							while (true)
 							{
 								L2TP_QUEUE *q;
 								if (LIST_NUM(t->RecvQueue) == 0)
@@ -2122,8 +2135,21 @@ void L2TPProcessInterrupts(L2TP_SERVER *l2tp)
 	{
 		L2TP_TUNNEL *t = LIST_DATA(l2tp->TunnelList, i);
 		LIST *delete_session_list = NULL;
+		UINT64 l2tpTimeout = L2TP_TUNNEL_TIMEOUT;
 
-		if ((l2tp->Now >= (t->LastRecvTick + (UINT64)L2TP_TUNNEL_TIMEOUT)) && t->Timedout == false)
+		// If we got on ANY session a higher timeout than the default L2TP tunnel timeout, increase it
+		for (i = 0; i < LIST_NUM(t->SessionList); i++)
+		{
+			L2TP_SESSION* s = LIST_DATA(t->SessionList, i);
+
+			if (s->TubeRecv != NULL && s->TubeRecv->DataTimeout > l2tpTimeout)
+			{
+				l2tpTimeout = s->TubeRecv->DataTimeout;
+			}
+		}
+
+
+		if ((l2tp->Now >= (t->LastRecvTick + (UINT64)l2tpTimeout)) && t->Timedout == false)
 		{
 			// Disconnect the tunnel forcibly if data can not be received for a certain period of time
 			t->Timedout = true;

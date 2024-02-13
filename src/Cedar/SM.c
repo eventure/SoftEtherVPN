@@ -5,37 +5,34 @@
 // SM.c
 // VPN Server Manager for Win32
 
-#include <GlobalConst.h>
+#ifdef OS_WIN32
 
-#ifdef	WIN32
-
-#define	SM_C
-#define	CM_C
-#define	NM_C
-
-#define	_WIN32_WINNT		0x0502
-#define	WINVER				0x0502
-#include <winsock2.h>
-#include <windows.h>
-#include <wincrypt.h>
-#include <wininet.h>
-#include <shlobj.h>
-#include <commctrl.h>
-#include <Dbghelp.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <wchar.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
-#include <Mayaqua/Mayaqua.h>
-#include <Cedar/Cedar.h>
-#include "CMInner.h"
+#include "SM.h"
 #include "SMInner.h"
+
+#include "AzureClient.h"
+#include "CMInner.h"
+#include "Console.h"
+#include "Database.h"
+#include "Layer3.h"
 #include "NMInner.h"
-#include "EMInner.h"
+#include "Proto_PPP.h"
+#include "Radius.h"
+#include "Remote.h"
+#include "Server.h"
+
+#include "Mayaqua/Cfg.h"
+#include "Mayaqua/FileIO.h"
+#include "Mayaqua/Internat.h"
+#include "Mayaqua/Memory.h"
+#include "Mayaqua/Microsoft.h"
+#include "Mayaqua/Secure.h"
+#include "Mayaqua/Str.h"
+
 #include "../PenCore/resource.h"
+
+#include <shellapi.h>
+#include <shlobj.h>
 
 // Global variable
 static SM *sm = NULL;
@@ -113,6 +110,7 @@ UINT SmProxyDlg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *param)
 		case R_DIRECT_TCP:
 		case R_HTTPS:
 		case R_SOCKS:
+		case R_SOCKS5:
 			if (IsChecked(hWnd, R_HTTPS))
 			{
 				t->ProxyType = PROXY_HTTP;
@@ -808,9 +806,6 @@ static UINT SmDdnsGetKey(char *key, SM_DDNS *d){
 
 void SmDDnsDlgInit(HWND hWnd, SM_DDNS *d)
 {
-	char key[20];
-	char encodedkey[20 * 4 + 32];
-
 	// Validate arguments
 	if (hWnd == NULL || d == NULL)
 	{
@@ -833,10 +828,10 @@ void SmDDnsDlgInit(HWND hWnd, SM_DDNS *d)
 	SetFont(hWnd, S_SUFFIX, GetFont("Verdana", 10, false, false, false, false));
 	SetFont(hWnd, E_NEWHOST, GetFont("Verdana", 10, false, false, false, false));
 
-	SetFont(hWnd, E_HOST, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 10, false, false, false, false));
-	SetFont(hWnd, E_IPV4, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 10, false, false, false, false));
-	SetFont(hWnd, E_IPV6, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 10, false, false, false, false));
-	SetFont(hWnd, E_KEY, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 8, false, false, false, false));
+	SetFont(hWnd, E_HOST, GetFont("Verdana", 10, false, false, false, false));
+	SetFont(hWnd, E_IPV4, GetFont("Verdana", 10, false, false, false, false));
+	SetFont(hWnd, E_IPV6, GetFont("Verdana", 10, false, false, false, false));
+	SetFont(hWnd, E_KEY, GetFont("Verdana", 8, false, false, false, false));
 
 	DlgFont(hWnd, IDOK, 0, true);
 
@@ -847,10 +842,15 @@ void SmDDnsDlgInit(HWND hWnd, SM_DDNS *d)
 
 	Hide(hWnd, B_PROXY);
 
-	if(SmDdnsGetKey(key, d) == ERR_NO_ERROR){
-		encodedkey[ B64_Encode(encodedkey, key, 20) ] = 0;
-		SetTextA(hWnd, E_KEY, encodedkey);
-	}else{
+	char key[20];
+	if (SmDdnsGetKey(key, d) == ERR_NO_ERROR)
+	{
+		char *encoded_key = Base64FromBin(NULL, key, sizeof(key));
+		SetTextA(hWnd, E_KEY, encoded_key);
+		Free(encoded_key);
+	}
+	else
+	{
 		SetText(hWnd, E_KEY, _UU("SM_DDNS_KEY_ERR"));
 	}
 
@@ -1055,7 +1055,6 @@ void SmOpenVpn(HWND hWnd, SM_SERVER *s)
 UINT SmOpenVpnDlg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *param)
 {
 	SM_SERVER *s = (SM_SERVER *)param;
-	char tmp[MAX_SIZE];
 	// Validate arguments
 	if (hWnd == NULL)
 	{
@@ -1072,7 +1071,6 @@ UINT SmOpenVpnDlg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *param
 		switch (LOWORD(wParam))
 		{
 		case R_OPENVPN:
-		case E_UDP:
 		case R_SSTP:
 			SmOpenVpnDlgUpdate(hWnd, s);
 			break;
@@ -1082,12 +1080,6 @@ UINT SmOpenVpnDlg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *param
 		{
 		case IDOK:
 			SmOpenVpnDlgOnOk(hWnd, s, false);
-			break;
-
-		case B_DEFAULT:
-			ToStr(tmp, OPENVPN_UDP_PORT);
-			SetTextA(hWnd, E_UDP, tmp);
-			FocusEx(hWnd, E_UDP);
 			break;
 
 		case B_CONFIG:
@@ -1198,13 +1190,11 @@ void SmOpenVpnDlgInit(HWND hWnd, SM_SERVER *s)
 	}
 
 	Check(hWnd, R_OPENVPN, t.EnableOpenVPN);
-	SetTextA(hWnd, E_UDP, t.OpenVPNPortList);
 	Check(hWnd, R_SSTP, t.EnableSSTP);
 
 	SetIcon(hWnd, 0, ICO_OPENVPN);
 
 	DlgFont(hWnd, S_TITLE, 14, true);
-	SetFont(hWnd, E_UDP, GetFont("Verdana", 10, false, false, false, false));
 
 	DlgFont(hWnd, R_OPENVPN, 0, true);
 	DlgFont(hWnd, S_TOOL, 11, true);
@@ -1224,10 +1214,6 @@ void SmOpenVpnDlgUpdate(HWND hWnd, SM_SERVER *s)
 	b1 = IsChecked(hWnd, R_OPENVPN);
 	b2 = IsChecked(hWnd, R_SSTP);
 
-	SetEnable(hWnd, S_UDP, b1);
-	SetEnable(hWnd, E_UDP, b1);
-	SetEnable(hWnd, B_DEFAULT, b1);
-	SetEnable(hWnd, S_UDP2, b1);
 	SetEnable(hWnd, S_TOOL, b1);
 	SetEnable(hWnd, S_TOOL2, b1);
 	SetEnable(hWnd, B_CONFIG, b1);
@@ -1246,7 +1232,6 @@ void SmOpenVpnDlgOnOk(HWND hWnd, SM_SERVER *s, bool no_close)
 	Zero(&t, sizeof(t));
 
 	t.EnableOpenVPN = IsChecked(hWnd, R_OPENVPN);
-	GetTxtA(hWnd, E_UDP, t.OpenVPNPortList, sizeof(t.OpenVPNPortList));
 	t.EnableSSTP = IsChecked(hWnd, R_SSTP);
 
 	if (CALL(hWnd, ScSetOpenVpnSstpConfig(s->Rpc, &t)) == false)
@@ -2006,14 +1991,7 @@ void SmHubMsgDlgInit(HWND hWnd, SM_EDIT_HUB *s)
 		return;
 	}
 
-	if (MsIsVista())
-	{
-		SetFont(hWnd, E_TEXT, GetMeiryoFont());
-	}
-	else
-	{
-		DlgFont(hWnd, E_TEXT, 11, false);
-	}
+	SetFont(hWnd, E_TEXT, GetMeiryoFont());
 
 	FormatText(hWnd, S_MSG_2, s->HubName);
 
@@ -8009,7 +7987,9 @@ void SmBridgeDlgOnOk(HWND hWnd, SM_SERVER *s)
 	StrCpy(t.HubName, sizeof(t.HubName), hub);
 	t.TapMode = tapmode;
 
-	if (InStrEx(t.DeviceName, "vpn", false) || InStrEx(t.DeviceName, "tun", false)
+	if (InStrEx(t.DeviceName, UNIX_VLAN_CLIENT_IFACE_PREFIX, false)
+		|| InStrEx(t.DeviceName, UNIX_VLAN_BRIDGE_IFACE_PREFIX, false)
+		|| InStrEx(t.DeviceName, "tun", false)
 		|| InStrEx(t.DeviceName, "tap", false))
 	{
 		// Trying to make a local bridge to the VPN device
@@ -8208,7 +8188,7 @@ void SmInstallWinPcap(HWND hWnd, SM_SERVER *s)
 	UniFormat(temp_name, sizeof(temp_name), L"%s\\winpcap_installer.exe", MsGetTempDirW());
 
 	// Read from hamcore
-	buf = ReadDump(MsIsNt() ? "|winpcap_installer.exe" : "|winpcap_installer_win9x.exe");
+	buf = ReadDump("|winpcap_installer.exe");
 	if (buf == NULL)
 	{
 RES_ERROR:
@@ -8244,31 +8224,22 @@ RES_ERROR:
 		return;
 	}
 
-	// Message after completed
-	if (OS_IS_WINDOWS_NT(GetOsInfo()->OsType) == false)
+	// Need to restart the service
+	if (MsgBox(hWnd, MB_ICONQUESTION | MB_YESNO, _UU("SM_BRIDGE_WPCAP_REBOOT2")) == IDNO)
 	{
-		// Need to restart the computer
-		MsgBox(hWnd, MB_ICONINFORMATION, _UU("SM_BRIDGE_WPCAP_REBOOT1"));
+		// Not restart
 	}
 	else
 	{
-		// Need to restart the service
-		if (MsgBox(hWnd, MB_ICONQUESTION | MB_YESNO, _UU("SM_BRIDGE_WPCAP_REBOOT2")) == IDNO)
-		{
-			// Not restart
-		}
-		else
-		{
-			// Restart
-			RPC_TEST t;
-			Zero(&t, sizeof(t));
-			ScRebootServer(s->Rpc, &t);
+		// Restart
+		RPC_TEST t;
+		Zero(&t, sizeof(t));
+		ScRebootServer(s->Rpc, &t);
 
-			SleepThread(500);
+		SleepThread(500);
 
-			Zero(&t, sizeof(t));
-			CALL(hWnd, ScTest(s->Rpc, &t));
-		}
+		Zero(&t, sizeof(t));
+		CALL(hWnd, ScTest(s->Rpc, &t));
 	}
 }
 
@@ -8300,7 +8271,7 @@ void SmBridgeDlg(HWND hWnd, SM_SERVER *s)
 
 	if (t.IsWinPcapNeeded)
 	{
-		if (s->Rpc->Sock->RemoteIP.addr[0] != 127)
+		if (IsLocalHostIP(&s->Rpc->Sock->RemoteIP) == false)
 		{
 			// WinPcap is required, but can not do anything because it is in remote control mode
 			MsgBox(hWnd, MB_ICONINFORMATION, _UU("SM_BRIDGE_WPCAP_REMOTE"));
@@ -8530,14 +8501,14 @@ void SmCreateCertDlgInit(HWND hWnd, SM_CERT *s)
 	}
 
 	// Font
-	SetFont(hWnd, E_CN, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 0, false, false, false, false));
-	SetFont(hWnd, E_O, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 0, false, false, false, false));
-	SetFont(hWnd, E_OU, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 0, false, false, false, false));
-	SetFont(hWnd, E_C, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 0, false, false, false, false));
-	SetFont(hWnd, E_ST, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 0, false, false, false, false));
-	SetFont(hWnd, E_L, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 0, false, false, false, false));
-	SetFont(hWnd, E_SERIAL, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 0, false, false, false, false));
-	SetFont(hWnd, E_EXPIRE, GetFont((MsIsWinXPOrGreater() ? "Verdana" : NULL), 0, false, false, false, false));
+	SetFont(hWnd, E_CN, GetFont("Verdana", 0, false, false, false, false));
+	SetFont(hWnd, E_O, GetFont("Verdana", 0, false, false, false, false));
+	SetFont(hWnd, E_OU, GetFont("Verdana", 0, false, false, false, false));
+	SetFont(hWnd, E_C, GetFont("Verdana", 0, false, false, false, false));
+	SetFont(hWnd, E_ST, GetFont("Verdana", 0, false, false, false, false));
+	SetFont(hWnd, E_L, GetFont("Verdana", 0, false, false, false, false));
+	SetFont(hWnd, E_SERIAL, GetFont("Verdana", 0, false, false, false, false));
+	SetFont(hWnd, E_EXPIRE, GetFont("Verdana", 0, false, false, false, false));
 	SetFont(hWnd, C_BITS, GetFont("Verdana", 0, false, false, false, false));
 
 	FocusEx(hWnd, E_CN);
@@ -9364,12 +9335,6 @@ void SmSessionDlgUpdate(HWND hWnd, SM_HUB *s)
 		}
 	}
 
-	if (s->p->ServerInfo.ServerBuildInt < 2844)
-	{
-		// Old version doesn't support for remote management of the sessions
-		ok2 = ok;
-	}
-
 	SetEnable(hWnd, IDOK, ok2);
 	SetEnable(hWnd, B_DISCONNECT, ok2);
 	SetEnable(hWnd, B_SESSION_IP_TABLE, ok);
@@ -9651,7 +9616,7 @@ bool SmRefreshSessionStatus(HWND hWnd, SM_SERVER *s, void *param)
 
 	b = LvInsertStart();
 
-	if (t.ClientIp != 0)
+	if (t.ClientIp != 0 || IsZero(t.ClientIp6, sizeof(t.ClientIp6)) == false)
 	{
 		IPToStr4or6(str, sizeof(str), t.ClientIp, t.ClientIp6);
 		StrToUni(tmp, sizeof(tmp), str);
@@ -10323,6 +10288,7 @@ bool SmLinkEdit(HWND hWnd, SM_HUB *s, wchar_t *name)
 	a.ClientAuth = CopyClientAuth(t.ClientAuth);
 	Copy(&a.Policy, &t.Policy, sizeof(POLICY));
 	a.CheckServerCert = t.CheckServerCert;
+	a.AddDefaultCA = t.AddDefaultCA;
 	a.ServerCert = CloneX(t.ServerCert);
 	a.HideTrustCert = GetCapsBool(s->p->CapsList, "b_support_config_hub");
 	FreeRpcCreateLink(&t);
@@ -15542,12 +15508,6 @@ UINT SmFarmMemberDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void
 	return 0;
 }
 
-// Convert the string to port list
-LIST *SmStrToPortList(char *str)
-{
-	return StrToPortList(str);
-}
-
 // Initialize the dialog
 void SmFarmDlgInit(HWND hWnd, SM_SERVER *p)
 {
@@ -15680,7 +15640,7 @@ void SmFarmDlgUpdate(HWND hWnd, SM_SERVER *p)
 		}
 
 		s = GetTextA(hWnd, E_PORT);
-		o = SmStrToPortList(s);
+		o = StrToPortList(s, true);
 		if (o == NULL)
 		{
 			ok = false;
@@ -15787,7 +15747,7 @@ void SmFarmDlgOnOk(HWND hWnd, SM_SERVER *p)
 			s = GetTextA(hWnd, E_PORT);
 			if (s != NULL)
 			{
-				LIST *o = SmStrToPortList(s);
+				LIST *o = StrToPortList(s, true);
 				if (o != NULL)
 				{
 					UINT i;
@@ -16852,6 +16812,7 @@ void SmSslDlgOnOk(HWND hWnd, SM_SSL *s)
 
 		t.Cert = CloneX(s->Cert);
 		t.Key = CloneK(s->Key);
+		t.Chain = CloneXList(s->Chain);
 
 		if (CALL(hWnd, ScSetServerCert(s->p->Rpc, &t)) == false)
 		{
@@ -16966,6 +16927,7 @@ void SmSslDlgInit(HWND hWnd, SM_SSL *s)
 			// Copy the certificate and key
 			s->Cert = CloneX(t.Cert);
 			s->Key = CloneK(t.Key);
+			s->Chain = CloneXList(t.Chain);
 
 			if (t.Key != NULL)
 			{
@@ -17217,6 +17179,7 @@ UINT SmSslDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *param
 	SM_SSL *s = (SM_SSL *)param;
 	X *x;
 	K *k;
+	LIST *chain = NULL;
 	// Validate arguments
 	if (hWnd == NULL)
 	{
@@ -17265,16 +17228,18 @@ UINT SmSslDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *param
 
 		case B_IMPORT:
 			// Import
-			if (CmLoadXAndK(hWnd, &x, &k))
+			if (CmLoadXListAndK(hWnd, &x, &k, &chain))
 			{
 				wchar_t tmp[MAX_SIZE];
 
 LABEL_APPLY_NEW_CERT:
 				FreeX(s->Cert);
 				FreeK(s->Key);
+				FreeXList(s->Chain);
 				s->Cert = x;
 				s->Key = k;
 				s->SetCertAndKey = true;
+				s->Chain = chain;
 				// Show the Certificate Information
 				SmGetCertInfoStr(tmp, sizeof(tmp), s->Cert);
 				SetText(hWnd, S_CERT_INFO, tmp);
@@ -17353,6 +17318,7 @@ void SmSslDlg(HWND hWnd, SM_SERVER *p)
 	// Cleanup
 	FreeX(s.Cert);
 	FreeK(s.Key);
+	FreeXList(s.Chain);
 }
 
 // Listener creation dialog procedure
@@ -18278,6 +18244,7 @@ void SmServerDlgRefresh(HWND hWnd, SM_SERVER *p)
 {
 	RPC_ENUM_HUB t;
 	RPC_LISTENER_LIST t2;
+	RPC_PORTS t3;
 	DDNS_CLIENT_STATUS st;
 	RPC_AZURE_STATUS sta;
 	UINT i;
@@ -18393,6 +18360,32 @@ void SmServerDlgRefresh(HWND hWnd, SM_SERVER *p)
 		}
 		LvInsertEnd(b, hWnd, L_LISTENER);
 		FreeRpcListenerList(&t2);
+	}
+
+	// Get the UDP ports
+	Zero(&t3, sizeof(RPC_PORTS));
+	if (CALL(hWnd, ScGetPortsUDP(p->Rpc, &t3)))
+	{
+		char str[MAX_SIZE];
+
+		Zero(str, sizeof(str));
+
+		if (t3.Num > 0)
+		{
+			UINT i;
+
+			Format(str, sizeof(str), "%u", t3.Ports[0]);
+
+			for (i = 1; i < t3.Num; ++i)
+			{
+				char tmp[MAX_SIZE];
+				Format(tmp, sizeof(tmp), ", %u", t3.Ports[i]);
+				StrCat(str, sizeof(str), tmp);
+			}
+		}
+
+		SetTextA(hWnd, E_UDP, str);
+		FreeRpcPorts(&t3);
 	}
 
 	// Get the DDNS client state
@@ -18669,6 +18662,44 @@ UINT SmServerDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *pa
 				}
 			}
 			break;
+
+		case B_APPLY:
+		{
+			// Apply UDP ports
+			LIST* ports;
+			RPC_PORTS t;
+			char tmp[MAX_SIZE];
+
+			GetTxtA(hWnd, E_UDP, tmp, sizeof(tmp));
+			ports = StrToPortList(tmp, false);
+
+			t.Num = LIST_NUM(ports);
+			if (t.Num > 0)
+			{
+				UINT i;
+				t.Ports = Malloc(sizeof(UINT) * t.Num);
+
+				for (i = 0; i < t.Num; ++i)
+				{
+					t.Ports[i] = (UINT)LIST_DATA(ports, i);
+				}
+			}
+			else
+			{
+				t.Ports = NULL;
+			}
+
+			ReleaseList(ports);
+
+			if (CALL(hWnd, ScSetPortsUDP(p->Rpc, &t)))
+			{
+				SmServerDlgRefresh(hWnd, p);
+			}
+
+			Free(t.Ports);
+
+			break;
+		}
 
 		case B_SSL:
 			// SSL related
@@ -19332,7 +19363,14 @@ void SmEditSettingDlgInit(HWND hWnd, SM_EDIT_SETTING *p)
 	SetText(hWnd, E_ACCOUNT_NAME, s->Title);
 
 	// Host name
-	SetTextA(hWnd, E_HOSTNAME, s->ClientOption.Hostname);
+	char hostname[MAX_SIZE];
+	StrCpy(hostname, sizeof(hostname), s->ClientOption.Hostname);
+	if (IsEmptyStr(s->ClientOption.HintStr) == false)
+	{
+		StrCat(hostname, sizeof(hostname), "/");
+		StrCat(hostname, sizeof(hostname), s->ClientOption.HintStr);
+	}
+	SetTextA(hWnd, E_HOSTNAME, hostname);
 
 	// Port number
 	CbSetHeight(hWnd, C_PORT, 18);
@@ -19422,6 +19460,16 @@ void SmEditSettingDlgUpdate(HWND hWnd, SM_EDIT_SETTING *p)
 
 	GetTxtA(hWnd, E_HOSTNAME, tmp, sizeof(tmp));
 	Trim(tmp);
+	UINT i = SearchStrEx(tmp, "/", 0, false);
+	if (i != INFINITE)
+	{
+		StrCpy(s->ClientOption.HintStr, sizeof(s->ClientOption.HintStr), tmp + i + 1);
+		tmp[i] = 0;
+	}
+	else
+	{
+		s->ClientOption.HintStr[0] = 0;
+	}
 
 	if (StrCmpi(tmp, s->ClientOption.Hostname) != 0)
 	{
@@ -19578,6 +19626,7 @@ UINT SmEditSettingDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, voi
 		case R_DIRECT_TCP:
 		case R_HTTPS:
 		case R_SOCKS:
+		case R_SOCKS5:
 		case R_SERVER_ADMIN:
 		case R_HUB_ADMIN:
 		case C_HUBNAME:
@@ -19609,6 +19658,7 @@ UINT SmEditSettingDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, voi
 		case R_DIRECT_TCP:
 		case R_HTTPS:
 		case R_SOCKS:
+		case R_SOCKS5:
 			if (HIWORD(wParam) == BN_CLICKED)
 			{
 				CmEnumHubStart(hWnd, &p->Setting->ClientOption);
@@ -19927,6 +19977,215 @@ void SmWriteSettingList()
 	}
 }
 
+SETTING *LoadSetting9658(BUF *b)
+{
+	typedef struct OLD_CLIENT_OPTION
+	{
+		wchar_t AccountName[256];								// Connection setting name
+		char Hostname[256];										// Host name
+		UINT Port;												// Port number
+		UINT PortUDP;											// UDP port number (0: Use only TCP)
+		UINT ProxyType;											// Type of proxy
+		char ProxyName[256];									// Proxy server name
+		UINT ProxyPort;											// Port number of the proxy server
+		char ProxyUsername[256];								// Maximum user name length
+		char ProxyPassword[256];								// Maximum password length
+		UINT NumRetry;											// Automatic retries
+		UINT RetryInterval;										// Retry interval
+		char HubName[256];										// HUB name
+		UINT MaxConnection;										// Maximum number of concurrent TCP connections
+		UINT UseEncrypt;										// Use encrypted communication
+		UINT UseCompress;										// Use data compression
+		UINT HalfConnection;									// Use half connection in TCP
+		UINT NoRoutingTracking;									// Disable the routing tracking
+		char DeviceName[32];									// VLAN device name
+		UINT AdditionalConnectionInterval;						// Connection attempt interval when additional connection establish
+		UINT ConnectionDisconnectSpan;							// Disconnection interval
+		UINT HideStatusWindow;									// Hide the status window
+		UINT HideNicInfoWindow;									// Hide the NIC status window
+		UINT RequireMonitorMode;								// Monitor port mode
+		UINT RequireBridgeRoutingMode;							// Bridge or routing mode
+		UINT DisableQoS;										// Disable the VoIP / QoS function
+		UINT FromAdminPack;										// For Administration Pack
+		UINT NoUdpAcceleration;									// Do not use UDP acceleration mode
+		UCHAR HostUniqueKey[20];								// Host unique key
+	} OLD_CLIENT_OPTION;
+
+	typedef struct OLD_SETTING
+	{
+		wchar_t Title[512];				// Setting Name
+		UINT ServerAdminMode;			// Server management mode
+		char HubName[256];				// HUB name
+		UCHAR HashedPassword[20];		// Password
+		OLD_CLIENT_OPTION ClientOption;		// Client Option
+		UCHAR Reserved[10188];			// Reserved area
+	} OLD_SETTING;
+
+	if (b->Size != sizeof(OLD_SETTING))	// 13416
+	{
+		return NULL;
+	}
+
+	OLD_SETTING s0;
+	Copy(&s0, b->Buf, sizeof(OLD_SETTING));
+
+	SETTING *s = ZeroMalloc(sizeof(SETTING));
+	UniStrCpy(s->Title, sizeof(s->Title), s0.Title);
+	s->ServerAdminMode = s0.ServerAdminMode;
+	StrCpy(s->HubName, sizeof(s->HubName), s0.HubName);
+	Copy(s->HashedPassword, s0.HashedPassword, sizeof(s->HashedPassword));
+	UniStrCpy(s->ClientOption.AccountName, sizeof(s->ClientOption.AccountName), s0.ClientOption.AccountName);
+	StrCpy(s->ClientOption.Hostname, sizeof(s->ClientOption.Hostname), s0.ClientOption.Hostname);
+	s->ClientOption.Port = s0.ClientOption.Port;
+	s->ClientOption.ProxyType = s0.ClientOption.ProxyType;
+	StrCpy(s->ClientOption.ProxyName, sizeof(s->ClientOption.ProxyName), s0.ClientOption.ProxyName);
+	s->ClientOption.ProxyPort = s0.ClientOption.ProxyPort;
+	StrCpy(s->ClientOption.ProxyUsername, sizeof(s->ClientOption.ProxyUsername), s0.ClientOption.ProxyUsername);
+	StrCpy(s->ClientOption.ProxyPassword, sizeof(s->ClientOption.ProxyPassword), s0.ClientOption.ProxyPassword);
+
+	return s;
+}
+
+SETTING *LoadSetting9666(BUF *b)
+{
+	typedef struct OLD_CLIENT_OPTION
+	{
+		wchar_t AccountName[256];								// Connection setting name
+		char Hostname[256];										// Host name
+		UINT Port;												// Port number
+		UINT PortUDP;											// UDP port number (0: Use only TCP)
+		UINT ProxyType;											// Type of proxy
+		char ProxyName[256];									// Proxy server name
+		UINT ProxyPort;											// Port number of the proxy server
+		char ProxyUsername[256];								// Maximum user name length
+		char ProxyPassword[256];								// Maximum password length
+		char CustomHttpHeader[1025];							// Custom HTTP proxy header
+		UINT NumRetry;											// Automatic retries
+		UINT RetryInterval;										// Retry interval
+		char HubName[256];										// HUB name
+		UINT MaxConnection;										// Maximum number of concurrent TCP connections
+		UINT UseEncrypt;										// Use encrypted communication
+		UINT UseCompress;										// Use data compression
+		UINT HalfConnection;									// Use half connection in TCP
+		UINT NoRoutingTracking;									// Disable the routing tracking
+		char DeviceName[32];									// VLAN device name
+		UINT AdditionalConnectionInterval;						// Connection attempt interval when additional connection establish
+		UINT ConnectionDisconnectSpan;							// Disconnection interval
+		UINT HideStatusWindow;									// Hide the status window
+		UINT HideNicInfoWindow;									// Hide the NIC status window
+		UINT RequireMonitorMode;								// Monitor port mode
+		UINT RequireBridgeRoutingMode;							// Bridge or routing mode
+		UINT DisableQoS;										// Disable the VoIP / QoS function
+		UINT FromAdminPack;										// For Administration Pack
+		UINT NoUdpAcceleration;									// Do not use UDP acceleration mode
+		UCHAR HostUniqueKey[20];								// Host unique key
+	} OLD_CLIENT_OPTION;
+
+	typedef struct OLD_SETTING
+	{
+		wchar_t Title[512];				// Setting Name
+		UINT ServerAdminMode;			// Server management mode
+		char HubName[256];				// HUB name
+		UCHAR HashedPassword[20];		// Password
+		OLD_CLIENT_OPTION ClientOption;		// Client Option
+		UCHAR Reserved[10188];			// Reserved area
+	} OLD_SETTING;
+
+	if (b->Size != sizeof(OLD_SETTING))	// 14444
+	{
+		return NULL;
+	}
+
+	OLD_SETTING s0;
+	Copy(&s0, b->Buf, sizeof(OLD_SETTING));
+
+	SETTING *s = ZeroMalloc(sizeof(SETTING));
+	UniStrCpy(s->Title, sizeof(s->Title), s0.Title);
+	s->ServerAdminMode = s0.ServerAdminMode;
+	StrCpy(s->HubName, sizeof(s->HubName), s0.HubName);
+	Copy(s->HashedPassword, s0.HashedPassword, sizeof(s->HashedPassword));
+	UniStrCpy(s->ClientOption.AccountName, sizeof(s->ClientOption.AccountName), s0.ClientOption.AccountName);
+	StrCpy(s->ClientOption.Hostname, sizeof(s->ClientOption.Hostname), s0.ClientOption.Hostname);
+	s->ClientOption.Port = s0.ClientOption.Port;
+	s->ClientOption.ProxyType = s0.ClientOption.ProxyType;
+	StrCpy(s->ClientOption.ProxyName, sizeof(s->ClientOption.ProxyName), s0.ClientOption.ProxyName);
+	s->ClientOption.ProxyPort = s0.ClientOption.ProxyPort;
+	StrCpy(s->ClientOption.ProxyUsername, sizeof(s->ClientOption.ProxyUsername), s0.ClientOption.ProxyUsername);
+	StrCpy(s->ClientOption.ProxyPassword, sizeof(s->ClientOption.ProxyPassword), s0.ClientOption.ProxyPassword);
+
+	return s;
+}
+
+SETTING *LoadSetting502(BUF *b)
+{
+	typedef struct OLD_CLIENT_OPTION
+	{
+		wchar_t AccountName[256];								// Connection setting name
+		char Hostname[256];										// Host name
+		UINT Port;												// Port number
+		UINT PortUDP;											// UDP port number (0: Use only TCP)
+		UINT ProxyType;											// Type of proxy
+		char ProxyName[256];									// Proxy server name
+		UINT ProxyPort;											// Port number of the proxy server
+		char ProxyUsername[256];								// Maximum user name length
+		char ProxyPassword[256];								// Maximum password length
+		char CustomHttpHeader[1025];							// Custom HTTP proxy header
+		UINT NumRetry;											// Automatic retries
+		UINT RetryInterval;										// Retry interval
+		char HubName[256];										// HUB name
+		UINT MaxConnection;										// Maximum number of concurrent TCP connections
+		bool UseEncrypt;										// Use encrypted communication
+		bool UseCompress;										// Use data compression
+		bool HalfConnection;									// Use half connection in TCP
+		bool NoRoutingTracking;									// Disable the routing tracking
+		char DeviceName[32];									// VLAN device name
+		UINT AdditionalConnectionInterval;						// Connection attempt interval when additional connection establish
+		UINT ConnectionDisconnectSpan;							// Disconnection interval
+		bool HideStatusWindow;									// Hide the status window
+		bool HideNicInfoWindow;									// Hide the NIC status window
+		bool RequireMonitorMode;								// Monitor port mode
+		bool RequireBridgeRoutingMode;							// Bridge or routing mode
+		bool DisableQoS;										// Disable the VoIP / QoS function
+		bool FromAdminPack;										// For Administration Pack
+		bool NoUdpAcceleration;									// Do not use UDP acceleration mode
+		UCHAR HostUniqueKey[20];								// Host unique key
+	} OLD_CLIENT_OPTION;
+
+	typedef struct OLD_SETTING
+	{
+		wchar_t Title[512];				// Setting Name
+		bool ServerAdminMode;			// Server management mode
+		char HubName[256];				// HUB name
+		UCHAR HashedPassword[20];		// Password
+		OLD_CLIENT_OPTION ClientOption;		// Client Option
+		UCHAR Reserved[10212];			// Reserved area
+	} OLD_SETTING;
+
+	if (b->Size != sizeof(OLD_SETTING))	// 14436
+	{
+		return NULL;
+	}
+
+	OLD_SETTING s0;
+	Copy(&s0, b->Buf, sizeof(OLD_SETTING));
+
+	SETTING *s = ZeroMalloc(sizeof(SETTING));
+	UniStrCpy(s->Title, sizeof(s->Title), s0.Title);
+	s->ServerAdminMode = s0.ServerAdminMode;
+	StrCpy(s->HubName, sizeof(s->HubName), s0.HubName);
+	Copy(s->HashedPassword, s0.HashedPassword, sizeof(s->HashedPassword));
+	UniStrCpy(s->ClientOption.AccountName, sizeof(s->ClientOption.AccountName), s0.ClientOption.AccountName);
+	StrCpy(s->ClientOption.Hostname, sizeof(s->ClientOption.Hostname), s0.ClientOption.Hostname);
+	s->ClientOption.Port = s0.ClientOption.Port;
+	s->ClientOption.ProxyType = s0.ClientOption.ProxyType;
+	StrCpy(s->ClientOption.ProxyName, sizeof(s->ClientOption.ProxyName), s0.ClientOption.ProxyName);
+	s->ClientOption.ProxyPort = s0.ClientOption.ProxyPort;
+	StrCpy(s->ClientOption.ProxyUsername, sizeof(s->ClientOption.ProxyUsername), s0.ClientOption.ProxyUsername);
+	StrCpy(s->ClientOption.ProxyPassword, sizeof(s->ClientOption.ProxyPassword), s0.ClientOption.ProxyPassword);
+
+	return s;
+}
+
 // Load the connection list
 void SmLoadSettingList()
 {
@@ -19951,11 +20210,34 @@ void SmLoadSettingList()
 		BUF *b = MsRegReadBin(REG_CURRENT_USER, key_name, name);
 		if (b != NULL)
 		{
-			if (b->Size == sizeof(SETTING))
+			SETTING *s = NULL;
+			if (b->Size == 13416)	// 5.01 Build 9658 - 9665
 			{
-				SETTING *s = ZeroMalloc(sizeof(SETTING));
+				s = LoadSetting9658(b);
+			}
+			else if (b->Size == 14444)	// 5.01 Build 9666 - 9674
+			{
+				s = LoadSetting9666(b);
+			}
+			else if (b->Size == 14436)	// 5.02
+			{
+				s = LoadSetting502(b);
+			}
+			else if (b->Size == sizeof(SETTING))	// Must be 13420 (the size used since version 4.x)
+			{
+				s = ZeroMalloc(sizeof(SETTING));
 				Copy(s, b->Buf, sizeof(SETTING));
+			}
 
+			if (s != NULL)
+			{
+				// Migrate from old settings that mixed hint string with hostname
+				UINT i = SearchStrEx(s->ClientOption.Hostname, "/", 0, false);
+				if (i != INFINITE)
+				{
+					StrCpy(s->ClientOption.HintStr, sizeof(s->ClientOption.HintStr), s->ClientOption.Hostname + i + 1);
+					s->ClientOption.Hostname[i] = 0;
+				}
 				Add(sm->SettingList, s);
 			}
 			FreeBuf(b);
@@ -19982,26 +20264,17 @@ void SmInitDefaultSettingList()
 			{
 				MS_PROCESS *p = LIST_DATA(pl, i);
 
-				if (UniInStr(p->ExeFilenameW, L"vpnserver.exe") || UniInStr(p->ExeFilenameW, L"vpnserver_x64.exe") ||
-					UniInStr(p->ExeFilenameW, L"vpnserver_ia64.exe") ||
-					UniInStr(p->ExeFilenameW, L"vpnbridge.exe") || UniInStr(p->ExeFilenameW, L"vpnbridge_x64.exe") ||
-					UniInStr(p->ExeFilenameW, L"vpnbridge_ia64.exe"))
+				if (UniInStr(p->ExeFilenameW, L"vpnserver.exe") || UniInStr(p->ExeFilenameW, L"vpnbridge.exe"))
 				{
 					b = true;
 				}
 
-				if (UniInStr(p->ExeFilenameW, L"sevpnserver.exe") || UniInStr(p->ExeFilenameW, L"sevpnserver_x64.exe") ||
-					UniInStr(p->ExeFilenameW, L"sevpnserver_ia64.exe") ||
-					UniInStr(p->ExeFilenameW, L"sevpnbridge.exe") || UniInStr(p->ExeFilenameW, L"sevpnbridge_x64.exe") ||
-					UniInStr(p->ExeFilenameW, L"sevpnbridge_ia64.exe"))
+				if (UniInStr(p->ExeFilenameW, L"sevpnserver.exe") || UniInStr(p->ExeFilenameW, L"sevpnbridge.exe"))
 				{
 					b = true;
 				}
 
-				if (UniInStr(p->ExeFilenameW, L"utvpnserver.exe") || UniInStr(p->ExeFilenameW, L"utvpnserver_x64.exe") ||
-					UniInStr(p->ExeFilenameW, L"utvpnserver_ia64.exe") ||
-					UniInStr(p->ExeFilenameW, L"utvpnbridge.exe") || UniInStr(p->ExeFilenameW, L"utvpnbridge_x64.exe") ||
-					UniInStr(p->ExeFilenameW, L"utvpnbridge_ia64.exe"))
+				if (UniInStr(p->ExeFilenameW, L"utvpnserver.exe") || UniInStr(p->ExeFilenameW, L"utvpnbridge.exe"))
 				{
 					b = true;
 				}
@@ -20027,6 +20300,7 @@ void SmInitDefaultSettingList()
 			Sha0(s->HashedPassword, "", 0);
 			UniStrCpy(s->ClientOption.AccountName, sizeof(s->ClientOption.AccountName), s->Title);
 			StrCpy(s->ClientOption.Hostname, sizeof(s->ClientOption.Hostname), "localhost");
+			s->ClientOption.HintStr[0] = 0;
 			s->ClientOption.Port = GC_DEFAULT_PORT;
 
 			Add(sm->SettingList, s);
@@ -20116,7 +20390,14 @@ void SmRefreshSettingEx(HWND hWnd, wchar_t *select_name)
 			UniFormat(tmp, sizeof(tmp), _UU("SM_MODE_HUB"), s->HubName);
 		}
 
-		StrToUni(tmp2, sizeof(tmp2), s->ClientOption.Hostname);
+		char hostname[MAX_SIZE];
+		StrCpy(hostname, sizeof(hostname), s->ClientOption.Hostname);
+		if (IsEmptyStr(s->ClientOption.HintStr) == false)
+		{
+			StrCat(hostname, sizeof(hostname), "/");
+			StrCat(hostname, sizeof(hostname), s->ClientOption.HintStr);
+		}
+		StrToUni(tmp2, sizeof(tmp2), hostname);
 
 		LvInsertAdd(b,
 			(s->ServerAdminMode ? ICO_SERVER_ONLINE : ICO_HUB),
@@ -20535,6 +20816,12 @@ void SmParseCommandLine()
 
 					UniStrCpy(o->AccountName, sizeof(o->AccountName), s->Title);
 					StrCpy(o->Hostname, sizeof(o->Hostname), host);
+					UINT i = SearchStrEx(o->Hostname, "/", 0, false);
+					if (i != INFINITE)
+					{
+						StrCpy(o->HintStr, sizeof(o->HintStr), o->Hostname + i + 1);
+						o->Hostname[i] = 0;
+					}
 					o->Port = port;
 					o->ProxyType = PROXY_DIRECT;
 					StrCpy(o->DeviceName, sizeof(o->DeviceName), "DUMMY");

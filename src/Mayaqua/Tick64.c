@@ -5,21 +5,15 @@
 // Tick64.c
 // 64-bit real-time clock program
 
-#include <GlobalConst.h>
+#include "Tick64.h"
 
-#ifdef	WIN32
-#include <windows.h>
-#endif	// WIN32
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <wchar.h>
-#include <stdarg.h>
-#include <locale.h>
-#include <time.h>
-#include <errno.h>
-#include <Mayaqua/Mayaqua.h>
+#include "Kernel.h"
+#include "Memory.h"
+#include "Microsoft.h"
+#include "Object.h"
+#include "Str.h"
+#include "Unix.h"
+#include "Win32.h"
 
 static TICK64 *tk64 = NULL;
 static EVENT *halt_tick_event = NULL;
@@ -38,6 +32,23 @@ UINT64 TickHighres64()
 
 #endif	// OS_WIN32
 
+}
+
+UINT64 TickHighresNano64(bool raw)
+{
+	UINT64 ret = 0;
+
+#ifdef	OS_WIN32
+
+	ret = (UINT64)(MsGetHiResTimeSpan(MsGetHiResCounter()) * 1000000000.0f);
+
+#else	// OS_WIN32
+
+	ret = UnixGetHighresTickNano64(raw);
+
+#endif	// OS_WIN32
+
+	return ret;
 }
 
 // Convert the Tick value to time

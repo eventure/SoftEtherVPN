@@ -5,6 +5,17 @@
 // SMInner.h
 // The internal header of SM.c
 
+#ifndef SMINNER_H
+#define SMINNER_H
+
+#include "Admin.h"
+#include "Connection.h"
+#include "DDNS.h"
+#include "Proto_EtherIP.h"
+#include "WinUi.h"
+
+#include "Mayaqua/TcpIp.h"
+
 // Constants
 #define	SM_REG_KEY			"Software\\SoftEther VPN Developer Edition\\SoftEther VPN\\Server Manager"
 #define	SM_CERT_REG_KEY		"Software\\SoftEther VPN Developer Edition\\SoftEther VPN\\Server Manager\\Cert Tool"
@@ -20,14 +31,20 @@
 #define	SM_SETTING_REG_KEY_OLD	"Software\\SoftEther Corporation\\PacketiX VPN\\Server Manager\\Settings"
 
 // Connection setting
+// Do not change item size or order
+// Size must be kept at 13420 (use Reserved to adjust for new items)
 typedef struct SETTING
 {
 	wchar_t Title[MAX_SIZE];	// Setting Name
 	bool ServerAdminMode;		// Server management mode
+	char pad1[3];
 	char HubName[MAX_HUBNAME_LEN + 1];	// HUB name
 	UCHAR HashedPassword[SHA1_SIZE];	// Password
 	CLIENT_OPTION ClientOption;	// Client Option
-	UCHAR Reserved[10240 - sizeof(bool) * 8 - SHA1_SIZE];	// Reserved area
+
+#define	SRC_SIZE		(sizeof(IP)	+ sizeof(UINT))		// Source IP address & port number for outgoing connection
+//	UCHAR Reserved[10240 - sizeof(UINT) * 8 - SHA1_SIZE - HTTP_CUSTOM_HEADER_MAX_SIZE - MAX_HOST_NAME_LEN - 1];	// Reserved area
+	UCHAR Reserved[10240 - sizeof(UINT) * 8 - SHA1_SIZE - HTTP_CUSTOM_HEADER_MAX_SIZE - MAX_HOST_NAME_LEN - 1 - SRC_SIZE];	// Reserved area
 } SETTING;
 
 // Structure declaration
@@ -101,6 +118,7 @@ typedef struct SM_SSL
 	SM_SERVER *p;				// P
 	X *Cert;					// Certificate
 	K *Key;						// Secret key
+	LIST *Chain;				// Trust chain
 	bool SetCertAndKey;			// Set the key
 } SM_SSL;
 
@@ -440,7 +458,6 @@ UINT SmFarmDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *para
 void SmFarmDlgInit(HWND hWnd, SM_SERVER *p);
 void SmFarmDlgUpdate(HWND hWnd, SM_SERVER *p);
 void SmFarmDlgOnOk(HWND hWnd, SM_SERVER *p);
-LIST *SmStrToPortList(char *str);
 UINT SmFarmMemberDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *param);
 void SmFarmMemberDlgInit(HWND hWnd, SM_SERVER *p);
 void SmFarmMemberDlgUpdate(HWND hWnd, SM_SERVER *p);
@@ -721,4 +738,4 @@ UINT SmProxyDlg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *param);
 void SmProxyDlgInit(HWND hWnd, INTERNET_SETTING *t);
 void SmProxyDlgUpdate(HWND hWnd, INTERNET_SETTING *t);
 
-
+#endif

@@ -8,6 +8,8 @@
 #ifndef	PACK_H
 #define	PACK_H
 
+#include "MayaType.h"
+
 // Constant
 #ifdef CPU_64
 
@@ -125,8 +127,10 @@ VALUE *NewInt64Value(UINT64 i);
 TOKEN_LIST *GetPackElementNames(PACK *p);
 
 X *PackGetX(PACK *p, char *name);
+LIST *PackGetXList(PACK *p, char *name);
 K *PackGetK(PACK *p, char *name);
 ELEMENT *PackAddX(PACK *p, char *name, X *x);
+ELEMENT *PackAddXList(PACK *p, char *name, LIST *chain);
 ELEMENT *PackAddK(PACK *p, char *name, K *k);
 ELEMENT *PackAddStr(PACK *p, char *name, char *str);
 ELEMENT *PackAddStrEx(PACK *p, char *name, char *str, UINT index, UINT total);
@@ -143,6 +147,8 @@ ELEMENT *PackAddData(PACK *p, char *name, void *data, UINT size);
 ELEMENT *PackAddDataEx(PACK *p, char *name, void *data, UINT size, UINT index, UINT total);
 ELEMENT *PackAddBuf(PACK *p, char *name, BUF *b);
 ELEMENT *PackAddBufEx(PACK *p, char *name, BUF *b, UINT index, UINT total);
+UINT PackGetStrSize(PACK *p, char *name);
+UINT PackGetStrSizeEx(PACK *p, char *name, UINT index);
 bool PackGetStr(PACK *p, char *name, char *str, UINT size);
 bool PackGetStrEx(PACK *p, char *name, char *str, UINT size, UINT index);
 bool PackGetUniStr(PACK *p, char *name, wchar_t *unistr, UINT size);

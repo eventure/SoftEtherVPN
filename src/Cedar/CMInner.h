@@ -5,9 +5,20 @@
 // CMInner.h
 // Internal header for the CM.c
 
+#include "Client.h"
+#include "CM.h"
+#include "Command.h"
+#include "WinUi.h"
+
+#include "Mayaqua/Table.h"
+
+#include <stdlib.h>
+
 #define STARTUP_MUTEX_NAME	GC_SW_SOFTETHER_PREFIX "vpncmgr_startup_mutex"
 
 #define	NAME_OF_VPN_CLIENT_MANAGER	"vpncmgr"
+
+typedef struct LVB LVB;
 
 void CmVoice(char *name);
 
@@ -129,6 +140,7 @@ typedef struct CM_ACCOUNT
 	bool Startup;						// Startup account
 	bool CheckServerCert;				// Check the server certificate
 	bool RetryOnServerCert;				// Retry on invalid server certificate
+	bool AddDefaultCA;					// Use default trust store
 	X *ServerCert;						// Server certificate
 	char old_server_name[MAX_HOST_NAME_LEN + 1];	// Old server name
 	bool Inited;						// Initialization flag
@@ -379,7 +391,7 @@ void CmPolicyDlg(HWND hWnd, CM_STATUS *st);
 UINT CmPolicyDlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, void *param);
 void CmPolicyDlgPrint(HWND hWnd, CM_POLICY *p);
 void CmPolicyDlgPrintEx(HWND hWnd, CM_POLICY *p, bool cascade_mode);
-void CmPolicyDlgPrintEx2(HWND hWnd, CM_POLICY *p, bool cascade_mode, bool ver);
+void CmPolicyDlgPrintEx2(HWND hWnd, CM_POLICY *p, bool cascade_mode, UINT ver);
 void CmNewAccount(HWND hWnd);
 void CmEditAccount(HWND hWnd, wchar_t *account_name);
 void CmGenerateNewAccountName(HWND hWnd, wchar_t *name, UINT size);
@@ -398,6 +410,7 @@ void CmEditAccountDlgInit(HWND hWnd, CM_ACCOUNT *a);
 void CmEditAccountDlgOnOk(HWND hWnd, CM_ACCOUNT *a);
 void CmEditAccountDlgStartEnumHub(HWND hWnd, CM_ACCOUNT *a);
 bool CmLoadXAndK(HWND hWnd, X **x, K **k);
+bool CmLoadXListAndK(HWND hWnd, X **x, K **k, LIST **cc);
 bool CmLoadKEx(HWND hWnd, K **k, char *filename, UINT size);
 bool CmLoadKExW(HWND hWnd, K **k, wchar_t *filename, UINT size);
 bool CmLoadXFromFileOrSecureCard(HWND hWnd, X **x);

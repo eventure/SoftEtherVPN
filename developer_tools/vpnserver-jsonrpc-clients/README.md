@@ -404,14 +404,14 @@ Name | Type | Description
 `AssignedClientLicenses_u32` | `number` (uint32) | Number of assigned client licenses (Useful to make a commercial version)
 `AssignedBridgeLicensesTotal_u32` | `number` (uint32) | Number of Assigned bridge license (cluster-wide), useful to make a commercial version
 `AssignedClientLicensesTotal_u32` | `number` (uint32) | Number of assigned client licenses (cluster-wide), useful to make a commercial version
-`Recv.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Recv)
-`Recv.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Recv)
-`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast count (Recv)
-`Recv.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Recv)
-`Send.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Send)
-`Send.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Recv.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Recv)
+`Recv.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Recv)
+`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Recv)
+`Recv.UnicastCount_u64` | `number` (uint64) | Unicast count (Recv)
+`Send.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Send.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Send)
 `Send.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Send)
-`Send.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Send)
+`Send.UnicastCount_u64` | `number` (uint64) | Unicast count (Send)
 `CurrentTime_dt` | `Date` | Current time
 `CurrentTick_u64` | `number` (uint64) | 64 bit High-Precision Logical System Clock
 `StartTime_dt` | `Date` | VPN Server Start-up time
@@ -1759,14 +1759,14 @@ Name | Type | Description
 `NumGroups_u32` | `number` (uint32) | Number of groups
 `NumMacTables_u32` | `number` (uint32) | Number of MAC table entries
 `NumIpTables_u32` | `number` (uint32) | Number of IP table entries
-`Recv.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Recv)
-`Recv.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Recv)
-`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast count (Recv)
-`Recv.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Recv)
-`Send.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Send)
-`Send.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Recv.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Recv)
+`Recv.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Recv)
+`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Recv)
+`Recv.UnicastCount_u64` | `number` (uint64) | Unicast count (Recv)
+`Send.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Send.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Send)
 `Send.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Send)
-`Send.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Send)
+`Send.UnicastCount_u64` | `number` (uint64) | Unicast count (Send)
 `SecureNATEnabled_bool` | `boolean` | Whether SecureNAT is enabled
 `LastCommTime_dt` | `Date` | Last communication date and time
 `LastLoginTime_dt` | `Date` | Last login date and time
@@ -2210,7 +2210,7 @@ Name | Type | Description
 `NoUdpAcceleration_bool` | `boolean` | Client Option Parameters: Do not use UDP acceleration mode if the value is true
 `AuthType_u32` | `number` (enum) | Authentication type<BR>Values:<BR>`0`: Anonymous authentication<BR>`1`: SHA-0 hashed password authentication<BR>`2`: Plain password authentication<BR>`3`: Certificate authentication
 `Username_str` | `string` (ASCII) | User name
-`HashedPassword_bin` | `string` (Base64 binary) | SHA-0 Hashed password. Valid only if ClientAuth_AuthType_u32 == SHA0_Hashed_Password (1). The SHA-0 hashed password must be caluclated by the SHA0(UpperCase(username_ascii_string) + password_ascii_string).
+`HashedPassword_bin` | `string` (Base64 binary) | SHA-0 Hashed password. Valid only if ClientAuth_AuthType_u32 == SHA0_Hashed_Password (1). The SHA-0 hashed password must be caluclated by the SHA0(password_ascii_string + UpperCase(username_ascii_string)).
 `PlainPassword_str` | `string` (ASCII) | Plaintext Password. Valid only if ClientAuth_AuthType_u32 == PlainPassword (2).
 `ClientX_bin` | `string` (Base64 binary) | Client certificate. Valid only if ClientAuth_AuthType_u32 == Cert (3).
 `ClientK_bin` | `string` (Base64 binary) | Client private key of the certificate. Valid only if ClientAuth_AuthType_u32 == Cert (3).
@@ -2352,7 +2352,7 @@ Name | Type | Description
 `NoUdpAcceleration_bool` | `boolean` | Client Option Parameters: Do not use UDP acceleration mode if the value is true
 `AuthType_u32` | `number` (enum) | Authentication type<BR>Values:<BR>`0`: Anonymous authentication<BR>`1`: SHA-0 hashed password authentication<BR>`2`: Plain password authentication<BR>`3`: Certificate authentication
 `Username_str` | `string` (ASCII) | User name
-`HashedPassword_bin` | `string` (Base64 binary) | SHA-0 Hashed password. Valid only if ClientAuth_AuthType_u32 == SHA0_Hashed_Password (1). The SHA-0 hashed password must be caluclated by the SHA0(UpperCase(username_ascii_string) + password_ascii_string).
+`HashedPassword_bin` | `string` (Base64 binary) | SHA-0 Hashed password. Valid only if ClientAuth_AuthType_u32 == SHA0_Hashed_Password (1). The SHA-0 hashed password must be caluclated by the SHA0(password_ascii_string + UpperCase(username_ascii_string)).
 `PlainPassword_str` | `string` (ASCII) | Plaintext Password. Valid only if ClientAuth_AuthType_u32 == PlainPassword (2).
 `ClientX_bin` | `string` (Base64 binary) | Client certificate. Valid only if ClientAuth_AuthType_u32 == Cert (3).
 `ClientK_bin` | `string` (Base64 binary) | Client private key of the certificate. Valid only if ClientAuth_AuthType_u32 == Cert (3).
@@ -2537,7 +2537,7 @@ Name | Type | Description
 `NoUdpAcceleration_bool` | `boolean` | Client Option Parameters: Do not use UDP acceleration mode if the value is true
 `AuthType_u32` | `number` (enum) | Authentication type<BR>Values:<BR>`0`: Anonymous authentication<BR>`1`: SHA-0 hashed password authentication<BR>`2`: Plain password authentication<BR>`3`: Certificate authentication
 `Username_str` | `string` (ASCII) | User name
-`HashedPassword_bin` | `string` (Base64 binary) | SHA-0 Hashed password. Valid only if ClientAuth_AuthType_u32 == SHA0_Hashed_Password (1). The SHA-0 hashed password must be caluclated by the SHA0(UpperCase(username_ascii_string) + password_ascii_string).
+`HashedPassword_bin` | `string` (Base64 binary) | SHA-0 Hashed password. Valid only if ClientAuth_AuthType_u32 == SHA0_Hashed_Password (1). The SHA-0 hashed password must be caluclated by the SHA0(password_ascii_string + UpperCase(username_ascii_string)).
 `PlainPassword_str` | `string` (ASCII) | Plaintext Password. Valid only if ClientAuth_AuthType_u32 == PlainPassword (2).
 `ClientX_bin` | `string` (Base64 binary) | Client certificate. Valid only if ClientAuth_AuthType_u32 == Cert (3).
 `ClientK_bin` | `string` (Base64 binary) | Client private key of the certificate. Valid only if ClientAuth_AuthType_u32 == Cert (3).
@@ -3712,14 +3712,14 @@ Name | Type | Description
 `RadiusUsername_utf` | `string` (UTF8) | Username in RADIUS server, optional, valid only if AuthType_u32 == Radius(4).
 `NtUsername_utf` | `string` (UTF8) | Username in NT Domain server, optional, valid only if AuthType_u32 == NT(5).
 `NumLogin_u32` | `number` (uint32) | Number of total logins of the user
-`Recv.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Recv)
-`Recv.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Recv)
-`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast count (Recv)
-`Recv.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Recv)
-`Send.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Send)
-`Send.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Recv.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Recv)
+`Recv.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Recv)
+`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Recv)
+`Recv.UnicastCount_u64` | `number` (uint64) | Unicast count (Recv)
+`Send.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Send.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Send)
 `Send.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Send)
-`Send.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Send)
+`Send.UnicastCount_u64` | `number` (uint64) | Unicast count (Send)
 `UsePolicy_bool` | `boolean` | The flag whether to use security policy
 `policy:Access_bool` | `boolean` | Security policy: Allow Access. The users, which this policy value is true, have permission to make VPN connection to VPN Server.
 `policy:DHCPFilter_bool` | `boolean` | Security policy: Filter DHCP Packets (IPv4). All IPv4 DHCP packets in sessions defined this policy will be filtered.
@@ -3925,14 +3925,14 @@ Name | Type | Description
 `RadiusUsername_utf` | `string` (UTF8) | Username in RADIUS server, optional, valid only if AuthType_u32 == Radius(4).
 `NtUsername_utf` | `string` (UTF8) | Username in NT Domain server, optional, valid only if AuthType_u32 == NT(5).
 `NumLogin_u32` | `number` (uint32) | Number of total logins of the user
-`Recv.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Recv)
-`Recv.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Recv)
-`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast count (Recv)
-`Recv.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Recv)
-`Send.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Send)
-`Send.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Recv.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Recv)
+`Recv.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Recv)
+`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Recv)
+`Recv.UnicastCount_u64` | `number` (uint64) | Unicast count (Recv)
+`Send.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Send.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Send)
 `Send.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Send)
-`Send.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Send)
+`Send.UnicastCount_u64` | `number` (uint64) | Unicast count (Send)
 `UsePolicy_bool` | `boolean` | The flag whether to use security policy
 `policy:Access_bool` | `boolean` | Security policy: Allow Access. The users, which this policy value is true, have permission to make VPN connection to VPN Server.
 `policy:DHCPFilter_bool` | `boolean` | Security policy: Filter DHCP Packets (IPv4). All IPv4 DHCP packets in sessions defined this policy will be filtered.
@@ -4087,14 +4087,14 @@ Name | Type | Description
 `RadiusUsername_utf` | `string` (UTF8) | Username in RADIUS server, optional, valid only if AuthType_u32 == Radius(4).
 `NtUsername_utf` | `string` (UTF8) | Username in NT Domain server, optional, valid only if AuthType_u32 == NT(5).
 `NumLogin_u32` | `number` (uint32) | Number of total logins of the user
-`Recv.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Recv)
-`Recv.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Recv)
-`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast count (Recv)
-`Recv.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Recv)
-`Send.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Send)
-`Send.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Recv.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Recv)
+`Recv.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Recv)
+`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Recv)
+`Recv.UnicastCount_u64` | `number` (uint64) | Unicast count (Recv)
+`Send.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Send.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Send)
 `Send.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Send)
-`Send.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Send)
+`Send.UnicastCount_u64` | `number` (uint64) | Unicast count (Send)
 `UsePolicy_bool` | `boolean` | The flag whether to use security policy
 `policy:Access_bool` | `boolean` | Security policy: Allow Access. The users, which this policy value is true, have permission to make VPN connection to VPN Server.
 `policy:DHCPFilter_bool` | `boolean` | Security policy: Filter DHCP Packets (IPv4). All IPv4 DHCP packets in sessions defined this policy will be filtered.
@@ -4425,14 +4425,14 @@ Name | Type | Description
 `Name_str` | `string` (ASCII) | The group name
 `Realname_utf` | `string` (UTF8) | Optional real name (full name) of the group, allow using any Unicode characters
 `Note_utf` | `string` (UTF8) | Optional, specify a description of the group
-`Recv.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Recv)
-`Recv.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Recv)
-`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast count (Recv)
-`Recv.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Recv)
-`Send.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Send)
-`Send.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Recv.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Recv)
+`Recv.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Recv)
+`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Recv)
+`Recv.UnicastCount_u64` | `number` (uint64) | Unicast count (Recv)
+`Send.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Send.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Send)
 `Send.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Send)
-`Send.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Send)
+`Send.UnicastCount_u64` | `number` (uint64) | Unicast count (Send)
 `UsePolicy_bool` | `boolean` | The flag whether to use security policy
 `policy:Access_bool` | `boolean` | Security policy: Allow Access. The users, which this policy value is true, have permission to make VPN connection to VPN Server.
 `policy:DHCPFilter_bool` | `boolean` | Security policy: Filter DHCP Packets (IPv4). All IPv4 DHCP packets in sessions defined this policy will be filtered.
@@ -4605,14 +4605,14 @@ Name | Type | Description
 `Name_str` | `string` (ASCII) | The group name
 `Realname_utf` | `string` (UTF8) | Optional real name (full name) of the group, allow using any Unicode characters
 `Note_utf` | `string` (UTF8) | Optional, specify a description of the group
-`Recv.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Recv)
-`Recv.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Recv)
-`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast count (Recv)
-`Recv.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Recv)
-`Send.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Send)
-`Send.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Recv.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Recv)
+`Recv.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Recv)
+`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Recv)
+`Recv.UnicastCount_u64` | `number` (uint64) | Unicast count (Recv)
+`Send.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Send.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Send)
 `Send.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Send)
-`Send.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Send)
+`Send.UnicastCount_u64` | `number` (uint64) | Unicast count (Send)
 `UsePolicy_bool` | `boolean` | The flag whether to use security policy
 `policy:Access_bool` | `boolean` | Security policy: Allow Access. The users, which this policy value is true, have permission to make VPN connection to VPN Server.
 `policy:DHCPFilter_bool` | `boolean` | Security policy: Filter DHCP Packets (IPv4). All IPv4 DHCP packets in sessions defined this policy will be filtered.
@@ -4743,14 +4743,14 @@ Name | Type | Description
 `Name_str` | `string` (ASCII) | The group name
 `Realname_utf` | `string` (UTF8) | Optional real name (full name) of the group, allow using any Unicode characters
 `Note_utf` | `string` (UTF8) | Optional, specify a description of the group
-`Recv.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Recv)
-`Recv.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Recv)
-`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast count (Recv)
-`Recv.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Recv)
-`Send.BroadcastBytes_u64` | `number` (uint64) | Number of broadcast packets (Send)
-`Send.BroadcastCount_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Recv.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Recv)
+`Recv.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Recv)
+`Recv.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Recv)
+`Recv.UnicastCount_u64` | `number` (uint64) | Unicast count (Recv)
+`Send.BroadcastBytes_u64` | `number` (uint64) | Broadcast bytes (Send)
+`Send.BroadcastCount_u64` | `number` (uint64) | Number of broadcast packets (Send)
 `Send.UnicastBytes_u64` | `number` (uint64) | Unicast bytes (Send)
-`Send.UnicastCount_u64` | `number` (uint64) | Unicast bytes (Send)
+`Send.UnicastCount_u64` | `number` (uint64) | Unicast count (Send)
 `UsePolicy_bool` | `boolean` | The flag whether to use security policy
 `policy:Access_bool` | `boolean` | Security policy: Allow Access. The users, which this policy value is true, have permission to make VPN connection to VPN Server.
 `policy:DHCPFilter_bool` | `boolean` | Security policy: Filter DHCP Packets (IPv4). All IPv4 DHCP packets in sessions defined this policy will be filtered.

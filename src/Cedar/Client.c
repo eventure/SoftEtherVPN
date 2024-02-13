@@ -1,11 +1,50 @@
 // SoftEther VPN Source Code - Developer Edition Master Branch
 // Cedar Communication Module
-
+// © 2020 Nokia
 
 // Client.c
 // Client Manager
 
-#include "CedarPch.h"
+#include "Client.h"
+
+#include "Account.h"
+#include "Admin.h"
+#include "Cedar.h"
+#include "CM.h"
+#include "Connection.h"
+#include "IPC.h"
+#include "Listener.h"
+#include "Logging.h"
+#include "Protocol.h"
+#include "Remote.h"
+#include "Virtual.h"
+#include "VLanUnix.h"
+#include "VLanWin32.h"
+#include "Win32Com.h"
+#include "WinUi.h"
+#ifdef	NO_VLAN
+#include "NullLan.h"
+#endif
+
+#include "Mayaqua/Cfg.h"
+#include "Mayaqua/Encrypt.h"
+#include "Mayaqua/FileIO.h"
+#include "Mayaqua/Internat.h"
+#include "Mayaqua/Kernel.h"
+#include "Mayaqua/MayaType.h"
+#include "Mayaqua/Memory.h"
+#include "Mayaqua/Microsoft.h"
+#include "Mayaqua/Network.h"
+#include "Mayaqua/Object.h"
+#include "Mayaqua/OS.h"
+#include "Mayaqua/Pack.h"
+#include "Mayaqua/Secure.h"
+#include "Mayaqua/Str.h"
+#include "Mayaqua/Table.h"
+#include "Mayaqua/Tick64.h"
+#include "Mayaqua/Win32.h"
+
+#include <stdlib.h>
 
 static CLIENT *client = NULL;
 static LISTENER *cn_listener = NULL;
@@ -410,27 +449,6 @@ typedef struct CNC_CONNECT_ERROR_DLG_THREAD_PARAM
 	bool HaltThread;
 	EVENT *Event;
 } CNC_CONNECT_ERROR_DLG_THREAD_PARAM;
-
-
-// Get the file name of vpnclient.exe in Win32
-char *CiGetVpnClientExeFileName()
-{
-	if (Is64() == false)
-	{
-		return CLIENT_WIN32_EXE_FILENAME;
-	}
-	else
-	{
-		if (IsX64())
-		{
-			return CLIENT_WIN32_EXE_FILENAME_X64;
-		}
-		else
-		{
-			return CLIENT_WIN32_EXE_FILENAME_IA64;
-		}
-	}
-}
 
 // Thread to stop forcibly the Certificate check dialog client
 void CncCheckCertHaltThread(THREAD *thread, void *param)
@@ -1129,11 +1147,7 @@ void Win32CnNicInfoThreadProc(THREAD *thread, void *param)
 		return;
 	}
 
-	if (MsIsNt())
-	{
-		// Do not show a dialog on Windows 9x system
-		NicInfo(info);
-	}
+	NicInfo(info);
 
 	Disconnect(info->Sock);
 }
@@ -1391,10 +1405,7 @@ void Win32CnExecDriverInstaller(SOCK *s, PACK *p)
 		return;
 	}
 
-	if (MsIsVista())
-	{
-		helper = CmStartUacHelper();
-	}
+	helper = CmStartUacHelper();
 
 	ret = MsExecDriverInstaller(arg);
 
@@ -1527,7 +1538,7 @@ void CnListenerProc(THREAD *thread, void *param)
 	AddRef(s->ref);
 	NoticeThreadInit(thread);
 
-	if (s->LocalIP.addr[0] == 127)
+	if (IsLocalHostIP(&s->LocalIP))
 	{
 		p = RecvPack(s);
 
@@ -1949,6 +1960,7 @@ RPC_CLIENT_CREATE_ACCOUNT *CiCfgToAccount(BUF *b)
 	t->StartupAccount = a->StartupAccount;
 	t->CheckServerCert = a->CheckServerCert;
 	t->RetryOnServerCert = a->RetryOnServerCert;
+	t->AddDefaultCA = a->AddDefaultCA;
 	t->ServerCert = a->ServerCert;
 	Free(a);
 
@@ -1973,6 +1985,7 @@ BUF *CiAccountToCfg(RPC_CLIENT_CREATE_ACCOUNT *t)
 	a.ClientAuth = t->ClientAuth;
 	a.CheckServerCert = t->CheckServerCert;
 	a.RetryOnServerCert = t->RetryOnServerCert;
+	a.AddDefaultCA = t->AddDefaultCA;
 	a.ServerCert = t->ServerCert;
 	a.StartupAccount = t->StartupAccount;
 
@@ -3660,7 +3673,6 @@ void InRpcClientConfig(CLIENT_CONFIG *c, PACK *p)
 	c->KeepConnectProtocol = PackGetInt(p, "KeepConnectProtocol");
 	c->KeepConnectInterval = PackGetInt(p, "KeepConnectInterval");
 	c->AllowRemoteConfig = PackGetInt(p, "AllowRemoteConfig") == 0 ? false : true;
-	c->NicDownOnDisconnect = PackGetBool(p, "NicDownOnDisconnect");
 	PackGetStr(p, "KeepConnectHost", c->KeepConnectHost, sizeof(c->KeepConnectHost));
 }
 void OutRpcClientConfig(PACK *p, CLIENT_CONFIG *c)
@@ -3676,7 +3688,6 @@ void OutRpcClientConfig(PACK *p, CLIENT_CONFIG *c)
 	PackAddInt(p, "KeepConnectProtocol", c->KeepConnectProtocol);
 	PackAddInt(p, "KeepConnectInterval", c->KeepConnectInterval);
 	PackAddInt(p, "AllowRemoteConfig", c->AllowRemoteConfig);
-	PackAddBool(p, "NicDownOnDisconnect", c->NicDownOnDisconnect);
 	PackAddStr(p, "KeepConnectHost", c->KeepConnectHost);
 }
 
@@ -4309,6 +4320,13 @@ void InRpcClientOption(CLIENT_OPTION *c, PACK *p)
 
 	PackGetUniStr(p, "AccountName", c->AccountName, sizeof(c->AccountName));
 	PackGetStr(p, "Hostname", c->Hostname, sizeof(c->Hostname));
+	// Extract hint string from hostname
+	UINT i = SearchStrEx(c->Hostname, "/", 0, false);
+	if (i != INFINITE)
+	{
+		StrCpy(c->HintStr, sizeof(c->HintStr), c->Hostname + i + 1);
+		c->Hostname[i] = 0;
+	}
 	c->Port = PackGetInt(p, "Port");
 	c->PortUDP = PackGetInt(p, "PortUDP");
 	c->ProxyType = PackGetInt(p, "ProxyType");
@@ -4327,6 +4345,9 @@ void InRpcClientOption(CLIENT_OPTION *c, PACK *p)
 	PackGetStr(p, "CustomHttpHeader", c->CustomHttpHeader, sizeof(c->CustomHttpHeader));
 	PackGetStr(p, "HubName", c->HubName, sizeof(c->HubName));
 	PackGetStr(p, "DeviceName", c->DeviceName, sizeof(c->DeviceName));
+	PackGetIp(p, "BindLocalIP", &c->BindLocalIP);// Source IP address for outgoing connection
+	c->BindLocalPort = PackGetInt(p, "BindLocalPort");// Source port nubmer for outgoing connection
+
 	c->UseEncrypt = PackGetInt(p, "UseEncrypt") ? true : false;
 	c->UseCompress = PackGetInt(p, "UseCompress") ? true : false;
 	c->HalfConnection = PackGetInt(p, "HalfConnection") ? true : false;
@@ -4346,7 +4367,20 @@ void OutRpcClientOption(PACK *p, CLIENT_OPTION *c)
 	}
 
 	PackAddUniStr(p, "AccountName", c->AccountName);
-	PackAddStr(p, "Hostname", c->Hostname);
+	// Append hint string to hostname
+	if (IsEmptyStr(c->HintStr))
+	{
+		// No hint
+		PackAddStr(p, "Hostname", c->Hostname);
+	}
+	else
+	{
+		char hostname[MAX_SIZE];
+		StrCpy(hostname, sizeof(hostname), c->Hostname);
+		StrCat(hostname, sizeof(hostname), "/");
+		StrCat(hostname, sizeof(hostname), c->HintStr);
+		PackAddStr(p, "Hostname", hostname);
+	}
 	PackAddStr(p, "ProxyName", c->ProxyName);
 	PackAddStr(p, "ProxyUsername", c->ProxyUsername);
 	PackAddStr(p, "ProxyPassword", c->ProxyPassword);
@@ -4374,6 +4408,8 @@ void OutRpcClientOption(PACK *p, CLIENT_OPTION *c)
 	PackAddBool(p, "FromAdminPack", c->FromAdminPack);
 	PackAddBool(p, "NoUdpAcceleration", c->NoUdpAcceleration);
 	PackAddData(p, "HostUniqueKey", c->HostUniqueKey, SHA1_SIZE);
+	PackAddIp(p, "BindLocalIP", &c->BindLocalIP);// Source IP address for outgoing connection
+	PackAddInt(p, "BindLocalPort", c->BindLocalPort);// Source port number for outgoing connection
 }
 
 // CLIENT_AUTH
@@ -4425,6 +4461,17 @@ void InRpcClientAuth(CLIENT_AUTH *c, PACK *p)
 		PackGetStr(p, "SecurePublicCertName", c->SecurePublicCertName, sizeof(c->SecurePublicCertName));
 		PackGetStr(p, "SecurePrivateKeyName", c->SecurePrivateKeyName, sizeof(c->SecurePrivateKeyName));
 		break;
+
+  case CLIENT_AUTHTYPE_OPENSSLENGINE:
+		b = PackGetBuf(p, "ClientX");
+		if (b != NULL)
+		{
+			c->ClientX = BufToX(b, false);
+			FreeBuf(b);
+		}
+    PackGetStr(p, "OpensslEnginePrivateKeyName", c->OpensslEnginePrivateKeyName, sizeof(c->OpensslEnginePrivateKeyName));
+    PackGetStr(p, "OpensslEngineName", c->OpensslEngineName, sizeof(c->OpensslEngineName));
+    break;
 	}
 }
 void OutRpcClientAuth(PACK *p, CLIENT_AUTH *c)
@@ -4471,6 +4518,17 @@ void OutRpcClientAuth(PACK *p, CLIENT_AUTH *c)
 		PackAddStr(p, "SecurePublicCertName", c->SecurePublicCertName);
 		PackAddStr(p, "SecurePrivateKeyName", c->SecurePrivateKeyName);
 		break;
+
+	case CLIENT_AUTHTYPE_OPENSSLENGINE:
+		b = XToBuf(c->ClientX, false);
+		if (b != NULL)
+		{
+			PackAddBuf(p, "ClientX", b);
+			FreeBuf(b);
+		}
+		PackAddStr(p, "OpensslEnginePrivateKeyName", c->OpensslEnginePrivateKeyName);
+		PackAddStr(p, "OpensslEngineName", c->OpensslEngineName);
+		break;
 	}
 }
 
@@ -4494,6 +4552,7 @@ void InRpcClientCreateAccount(RPC_CLIENT_CREATE_ACCOUNT *c, PACK *p)
 	c->StartupAccount = PackGetInt(p, "StartupAccount") ? true : false;
 	c->CheckServerCert = PackGetInt(p, "CheckServerCert") ? true : false;
 	c->RetryOnServerCert = PackGetInt(p, "RetryOnServerCert") ? true : false;
+	c->AddDefaultCA = PackGetInt(p, "AddDefaultCA") ? true : false;
 	b = PackGetBuf(p, "ServerCert");
 	if (b != NULL)
 	{
@@ -4517,6 +4576,7 @@ void OutRpcClientCreateAccount(PACK *p, RPC_CLIENT_CREATE_ACCOUNT *c)
 	PackAddInt(p, "StartupAccount", c->StartupAccount);
 	PackAddInt(p, "CheckServerCert", c->CheckServerCert);
 	PackAddInt(p, "RetryOnServerCert", c->RetryOnServerCert);
+	PackAddInt(p, "AddDefaultCA", c->AddDefaultCA);
 	if (c->ServerCert != NULL)
 	{
 		b = XToBuf(c->ServerCert, false);
@@ -4667,6 +4727,7 @@ void InRpcClientGetAccount(RPC_CLIENT_GET_ACCOUNT *c, PACK *p)
 	c->StartupAccount = PackGetInt(p, "StartupAccount") ? true : false;
 	c->CheckServerCert = PackGetInt(p, "CheckServerCert") ? true : false;
 	c->RetryOnServerCert = PackGetInt(p, "RetryOnServerCert") ? true : false;
+	c->AddDefaultCA = PackGetInt(p, "AddDefaultCA") ? true : false;
 	b = PackGetBuf(p, "ServerCert");
 	if (b != NULL)
 	{
@@ -4696,6 +4757,7 @@ void OutRpcClientGetAccount(PACK *p, RPC_CLIENT_GET_ACCOUNT *c)
 	PackAddInt(p, "StartupAccount", c->StartupAccount);
 	PackAddInt(p, "CheckServerCert", c->CheckServerCert);
 	PackAddInt(p, "RetryOnServerCert", c->RetryOnServerCert);
+	PackAddInt(p, "AddDefaultCA", c->AddDefaultCA);
 
 	if (c->ServerCert != NULL)
 	{
@@ -4782,6 +4844,7 @@ void InRpcClientGetConnectionStatus(RPC_CLIENT_GET_CONNECTION_STATUS *s, PACK *p
 
 	PackGetStr(p, "ServerName", s->ServerName, sizeof(s->ServerName));
 	PackGetStr(p, "ServerProductName", s->ServerProductName, sizeof(s->ServerProductName));
+	PackGetStr(p, "ProtocolVersion", s->ProtocolName, sizeof(s->ProtocolName));
 	PackGetStr(p, "CipherName", s->CipherName, sizeof(s->CipherName));
 	PackGetStr(p, "SessionName", s->SessionName, sizeof(s->SessionName));
 	PackGetStr(p, "ConnectionName", s->ConnectionName, sizeof(s->ConnectionName));
@@ -4818,6 +4881,7 @@ void InRpcClientGetConnectionStatus(RPC_CLIENT_GET_CONNECTION_STATUS *s, PACK *p
 	s->UseCompress = PackGetInt(p, "UseCompress") ? true : false;
 	s->IsRUDPSession = PackGetInt(p, "IsRUDPSession") ? true : false;
 	PackGetStr(p, "UnderlayProtocol", s->UnderlayProtocol, sizeof(s->UnderlayProtocol));
+	PackGetStr(p, "ProtocolDetails", s->ProtocolDetails, sizeof(s->ProtocolDetails));
 	s->IsUdpAccelerationEnabled = PackGetInt(p, "IsUdpAccelerationEnabled") ? true : false;
 	s->IsUsingUdpAcceleration = PackGetInt(p, "IsUsingUdpAcceleration") ? true : false;
 
@@ -4857,6 +4921,7 @@ void OutRpcClientGetConnectionStatus(PACK *p, RPC_CLIENT_GET_CONNECTION_STATUS *
 
 	PackAddStr(p, "ServerName", c->ServerName);
 	PackAddStr(p, "ServerProductName", c->ServerProductName);
+	PackAddStr(p, "ProtocolVersion", c->ProtocolName);
 	PackAddStr(p, "CipherName", c->CipherName);
 	PackAddStr(p, "SessionName", c->SessionName);
 	PackAddStr(p, "ConnectionName", c->ConnectionName);
@@ -4880,6 +4945,7 @@ void OutRpcClientGetConnectionStatus(PACK *p, RPC_CLIENT_GET_CONNECTION_STATUS *
 	PackAddBool(p, "UseCompress", c->UseCompress);
 	PackAddBool(p, "IsRUDPSession", c->IsRUDPSession);
 	PackAddStr(p, "UnderlayProtocol", c->UnderlayProtocol);
+	PackAddStr(p, "ProtocolDetails", c->ProtocolDetails);
 	PackAddBool(p, "IsUdpAccelerationEnabled", c->IsUdpAccelerationEnabled);
 	PackAddBool(p, "IsUsingUdpAcceleration", c->IsUsingUdpAcceleration);
 
@@ -5082,11 +5148,27 @@ void CiRpcAccepted(CLIENT *c, SOCK *s)
 		retcode = 1;
 	}
 
-	if (c->PasswordRemoteOnly && s->RemoteIP.addr[0] == 127)
+	if (c->PasswordRemoteOnly && IsLocalHostIP(&s->RemoteIP))
 	{
 		// If in a mode that requires a password only remote,
 		// the password sent from localhost is considered to be always correct
 		retcode = 0;
+	}
+
+	if (retcode == 0)
+	{
+		if (IsLocalHostIP(&s->RemoteIP) == false)
+		{
+			// If the RPC client is from network check whether the password is empty
+			UCHAR empty_password_hash[20];
+			Sha0(empty_password_hash, "", 0);
+			if (Cmp(empty_password_hash, hashed_password, SHA1_SIZE) == 0 ||
+				IsZero(hashed_password, SHA1_SIZE))
+			{
+				// Regard it as incorrect password
+				retcode = 1;
+			}
+		}
 	}
 
 	Lock(c->lock);
@@ -5095,7 +5177,7 @@ void CiRpcAccepted(CLIENT *c, SOCK *s)
 		{
 			// If the remote control is prohibited,
 			// identify whether this connection is from remote
-			if (s->RemoteIP.addr[0] != 127)
+			if (IsLocalHostIP(&s->RemoteIP) == false)
 			{
 				retcode = 2;
 			}
@@ -5192,13 +5274,20 @@ void CiRpcServerThread(THREAD *thread, void *param)
 
 	// Open the port
 	listener = NULL;
-	for (i = CLIENT_CONFIG_PORT;i < (CLIENT_CONFIG_PORT + 5);i++)
+	if (c->Config.DisableRpcDynamicPortListener == false)
 	{
-		listener = Listen(i);
-		if (listener != NULL)
+		for (i = CLIENT_CONFIG_PORT;i < (CLIENT_CONFIG_PORT + 5);i++)
 		{
-			break;
+			listener = ListenEx(i, !c->Config.AllowRemoteConfig);
+			if (listener != NULL)
+			{
+				break;
+			}
 		}
+	}
+	else
+	{
+		listener = ListenEx(CLIENT_CONFIG_PORT, !c->Config.AllowRemoteConfig);
 	}
 
 	if (listener == NULL)
@@ -5382,7 +5471,7 @@ NOTIFY_CLIENT *CcConnectNotify(REMOTE_CLIENT *rc)
 	NOTIFY_CLIENT *n;
 	SOCK *s;
 	char tmp[MAX_SIZE];
-	bool rpc_mode = false;
+	UINT rpc_mode = 0;
 	UINT port;
 	// Validate arguments
 	if (rc == NULL || rc->Rpc == NULL || rc->Rpc->Sock == NULL)
@@ -5726,7 +5815,6 @@ L_TRY:
 		CcGetClientVersion(ret, &t);
 		ret->OsType = t.OsType;
 		ret->Unix = OS_IS_UNIX(ret->OsType);
-		ret->Win9x = OS_IS_WINDOWS_9X(ret->OsType);
 		ret->IsVgcSupported = t.IsVgcSupported;
 		ret->ShowVgcLink = t.ShowVgcLink;
 		StrCpy(ret->ClientId, sizeof(ret->ClientId), t.ClientId);
@@ -5811,6 +5899,7 @@ void CiGetSessionStatus(RPC_CLIENT_GET_CONNECTION_STATUS *st, SESSION *s)
 				if (st->UseEncrypt)
 				{
 					StrCpy(st->CipherName, sizeof(st->CipherName), s->Connection->CipherName);
+					StrCpy(st->ProtocolName, sizeof(st->ProtocolName), s->Connection->SslVersion);
 				}
 				// Use of compression
 				st->UseCompress = s->UseCompress;
@@ -6283,17 +6372,12 @@ bool CtConnect(CLIENT *c, RPC_CLIENT_CONNECT *connect)
 		{
 			if (t.NumItem == 0)
 			{
-				// There are no virtual LAN cards in the system
-				if (OS_IS_WINDOWS_NT(GetOsInfo()->OsType) || OS_IS_UNIX(GetOsInfo()->OsType))
-				{
-					// Only in Linux system or Windows NT system,
-					// create a new virtual LAN card which named as "VPN" automatically
+					// Create a new virtual LAN card named "VPN" automatically
 					RPC_CLIENT_CREATE_VLAN t;
 
 					Zero(&t, sizeof(t));
 					StrCpy(t.DeviceName, sizeof(t.DeviceName), "VPN");
 					CtCreateVLan(c,  &t);
-				}
 			}
 
 			CiFreeClientEnumVLan(&t);
@@ -6425,6 +6509,11 @@ bool CtConnect(CLIENT *c, RPC_CLIENT_CONNECT *connect)
 						// Register a procedure for secure device authentication
 						r->ClientAuth->SecureSignProc = CiSecureSignProc;
 					}
+					else if (r->ClientAuth->AuthType == CLIENT_AUTHTYPE_OPENSSLENGINE)
+					{
+						/* r->ClientAuth->ClientK = OpensslEngineToK("asdf"); */
+						r->ClientAuth->SecureSignProc = NULL;
+					}
 					else
 					{
 						r->ClientAuth->SecureSignProc = NULL;
@@ -6445,7 +6534,7 @@ bool CtConnect(CLIENT *c, RPC_CLIENT_CONNECT *connect)
 
 					CLog(c, "LC_CONNECT", connect->AccountName);
 
-					r->ClientSession = NewClientSessionEx(c->Cedar, r->ClientOption, r->ClientAuth, pa, r, &c->Config.NicDownOnDisconnect);
+					r->ClientSession = NewClientSessionEx(c->Cedar, r->ClientOption, r->ClientAuth, pa, r);
 					Notify(r->ClientSession, CLIENT_NOTIFY_ACCOUNT_CHANGED);
 
 					ret = true;
@@ -6466,9 +6555,7 @@ bool CtConnect(CLIENT *c, RPC_CLIENT_CONNECT *connect)
 // Requires account and VLan lists of the CLIENT argument to be already locked
 bool CtVLansDown(CLIENT *c)
 {
-#ifndef UNIX_LINUX
-	return true;
-#else
+#if defined(UNIX_LINUX) || defined(UNIX_BSD)
 	int i;
 	LIST *tmpVLanList;
 	UNIX_VLAN t, *r;
@@ -6510,6 +6597,8 @@ bool CtVLansDown(CLIENT *c)
 
 	ReleaseList(tmpVLanList);
 	return result;
+#else
+	return true;
 #endif
 }
 
@@ -6517,9 +6606,7 @@ bool CtVLansDown(CLIENT *c)
 // Requires VLan list of the CLIENT argument to be already locked
 bool CtVLansUp(CLIENT *c)
 {
-#ifndef UNIX_LINUX
-	return true;
-#else
+#if defined(UNIX_LINUX) || defined(UNIX_BSD)
 	int i;
 	UNIX_VLAN *r;
 
@@ -6533,9 +6620,8 @@ bool CtVLansUp(CLIENT *c)
 		r = LIST_DATA(c->UnixVLanList, i);
 		UnixVLanSetState(r->Name, true);
 	}
-
-	return true;
 #endif
+	return true;
 }
 
 // Get the account information
@@ -6570,6 +6656,9 @@ bool CtGetAccount(CLIENT *c, RPC_CLIENT_GET_ACCOUNT *a)
 
 		Lock(r->lock);
 		{
+			// Copy account name (restore the correct case)
+			UniStrCpy(a->AccountName, sizeof(a->AccountName), r->ClientOption->AccountName);
+
 			// Copy the client option
 			if (a->ClientOption != NULL)
 			{
@@ -6589,6 +6678,7 @@ bool CtGetAccount(CLIENT *c, RPC_CLIENT_GET_ACCOUNT *a)
 
 			a->CheckServerCert = r->CheckServerCert;
 			a->RetryOnServerCert = r->RetryOnServerCert;
+			a->AddDefaultCA = r->AddDefaultCA;
 			a->ServerCert = NULL;
 			if (r->ServerCert != NULL)
 			{
@@ -6762,14 +6852,9 @@ bool CtSetClientConfig(CLIENT *c, CLIENT_CONFIG *o)
 	// Apply TAP state
 	LockList(c->AccountList);
 	LockList(c->UnixVLanList);
-	if (o->NicDownOnDisconnect)
-	{
-		CtVLansDown(c);
-	}
-	else
-	{
-		CtVLansUp(c);
-	}
+
+	CtVLansDown(c);
+
 	UnlockList(c->UnixVLanList);
 	UnlockList(c->AccountList);
 
@@ -7005,6 +7090,12 @@ bool CtEnumAccount(CLIENT *c, RPC_CLIENT_ENUM_ACCOUNT *e)
 
 			// Server name
 			StrCpy(item->ServerName, sizeof(item->ServerName), a->ClientOption->Hostname);
+			// Append hint string to hostname
+			if (IsEmptyStr(a->ClientOption->HintStr) == false)
+			{
+				StrCat(item->ServerName, sizeof(item->ServerName), "/");
+				StrCat(item->ServerName, sizeof(item->ServerName), a->ClientOption->HintStr);
+			}
 
 			// Proxy type
 			item->ProxyType = a->ClientOption->ProxyType;
@@ -7087,14 +7178,6 @@ bool CtSetAccount(CLIENT *c, RPC_CLIENT_CREATE_ACCOUNT *a, bool inner)
 			}
 		}
 
-		if (a->ServerCert != NULL && a->ServerCert->is_compatible_bit == false)
-		{
-			// Server certificate is invalid
-			UnlockList(c->AccountList);
-			CiSetError(c, ERR_NOT_RSA_1024);
-			return false;
-		}
-
 		Lock(ret->lock);
 		{
 
@@ -7130,6 +7213,7 @@ bool CtSetAccount(CLIENT *c, RPC_CLIENT_CREATE_ACCOUNT *a, bool inner)
 
 			ret->CheckServerCert = a->CheckServerCert;
 			ret->RetryOnServerCert = a->RetryOnServerCert;
+			ret->AddDefaultCA = a->AddDefaultCA;
 
 			if (a->ServerCert != NULL)
 			{
@@ -7214,14 +7298,6 @@ bool CtCreateAccount(CLIENT *c, RPC_CLIENT_CREATE_ACCOUNT *a, bool inner)
 			}
 		}
 
-		if (a->ServerCert != NULL && a->ServerCert->is_compatible_bit == false)
-		{
-			// The server certificate is invalid
-			UnlockList(c->AccountList);
-			CiSetError(c, ERR_NOT_RSA_1024);
-			return false;
-		}
-
 		// Add a new account
 		new_account = ZeroMalloc(sizeof(ACCOUNT));
 		new_account->lock = NewLock();
@@ -7237,6 +7313,7 @@ bool CtCreateAccount(CLIENT *c, RPC_CLIENT_CREATE_ACCOUNT *a, bool inner)
 
 		new_account->CheckServerCert = a->CheckServerCert;
 		new_account->RetryOnServerCert = a->RetryOnServerCert;
+		new_account->AddDefaultCA = a->AddDefaultCA;
 		if (a->ServerCert != NULL)
 		{
 			new_account->ServerCert = CloneX(a->ServerCert);
@@ -7642,13 +7719,6 @@ bool CtDeleteVLan(CLIENT *c, RPC_CLIENT_CREATE_VLAN *d)
 
 #else	// OS_WIN32
 
-	if (MsIsNt() == false)
-	{
-		// Not available in Win9x
-		CiSetError(c, ERR_NOT_SUPPORTED);
-		return false;
-	}
-
 	// Check whether the virtual LAN card are present
 	if (MsIsVLanExists(VLAN_ADAPTER_NAME_TAG, d->DeviceName) == false &&
 		MsIsVLanExists(VLAN_ADAPTER_NAME_TAG_OLD, d->DeviceName) == false)
@@ -8022,8 +8092,7 @@ bool CtUpgradeVLan(CLIENT *c, RPC_CLIENT_CREATE_VLAN *create)
 {
 	bool use_old_name = false;
 
-#ifdef	OS_WIN32
-	KAKUSHI *k = NULL;
+#ifdef OS_WIN32
 	MS_DRIVER_VER ver;
 #endif	// OS_WIN32
 
@@ -8043,13 +8112,6 @@ bool CtUpgradeVLan(CLIENT *c, RPC_CLIENT_CREATE_VLAN *create)
 
 	CiInitDriverVerStruct(&ver);
 
-	if (MsIsNt() == false)
-	{
-		// Not available in Win9x
-		CiSetError(c, ERR_NOT_SUPPORTED);
-		return false;
-	}
-
 	// Check whether the LAN card with the specified name already exists
 	if (MsIsVLanExists(VLAN_ADAPTER_NAME_TAG, create->DeviceName) == false &&
 		MsIsVLanExists(VLAN_ADAPTER_NAME_TAG_OLD, create->DeviceName) == false)
@@ -8066,46 +8128,18 @@ bool CtUpgradeVLan(CLIENT *c, RPC_CLIENT_CREATE_VLAN *create)
 		use_old_name = true;
 	}
 
-	if (MsIsVista() == false)
+	// Perform the installation
+	char tmp[MAX_SIZE];
+	Format(tmp, sizeof(tmp), "upgradevlan %s", create->DeviceName);
+
+	if (CncExecDriverInstaller(tmp) == false)
 	{
-		k = InitKakushi();	
+		// Installation Failed
+		CiSetError(c, ERR_VLAN_INSTALL_ERROR);
+		CiNotify(c);
+		CiSendGlobalPulse(c);
+		return false;
 	}
-
-
-	if (MsIsVista() == false)
-	{
-		// Perform the installation (other than Windows Vista)
-		if (MsUpgradeVLan(use_old_name ? VLAN_ADAPTER_NAME_TAG_OLD : VLAN_ADAPTER_NAME_TAG,
-			use_old_name ? VLAN_CONNECTION_NAME_OLD : VLAN_CONNECTION_NAME,
-			create->DeviceName, &ver) == false)
-		{
-			// Installation Failed
-			FreeKakushi(k);
-			CiSetError(c, ERR_VLAN_INSTALL_ERROR);
-			CiNotify(c);
-			CiSendGlobalPulse(c);
-			return false;
-		}
-	}
-	else
-	{
-		// Perform the installation (Windows Vista)
-		char tmp[MAX_SIZE];
-
-		Format(tmp, sizeof(tmp), "upgradevlan %s", create->DeviceName);
-
-		if (CncExecDriverInstaller(tmp) == false)
-		{
-			// Installation Failed
-			FreeKakushi(k);
-			CiSetError(c, ERR_VLAN_INSTALL_ERROR);
-			CiNotify(c);
-			CiSendGlobalPulse(c);
-			return false;
-		}
-	}
-
-	FreeKakushi(k);
 
 	CLog(c, "LC_UPDATE_VLAN", create->DeviceName);
 
@@ -8122,10 +8156,6 @@ bool CtCreateVLan(CLIENT *c, RPC_CLIENT_CREATE_VLAN *create)
 {
 	TOKEN_LIST *t;
 	UINT max_len;
-
-#ifdef	OS_WIN32
-	KAKUSHI *k = NULL;
-#endif	// OS_WIN32
 
 	// Validate arguments
 	if (c == NULL || create == NULL)
@@ -8183,7 +8213,7 @@ bool CtCreateVLan(CLIENT *c, RPC_CLIENT_CREATE_VLAN *create)
 		StrCpy(r->Name, sizeof(r->Name), create->DeviceName);
 
 		// Create a TUN
-		if (UnixVLanCreate(r->Name, r->MacAddress, !c->Config.NicDownOnDisconnect) == false)
+		if (UnixVLanCreate(r->Name, r->MacAddress, false) == false)
 		{
 			// Failure
 			Free(r);
@@ -8207,25 +8237,6 @@ bool CtCreateVLan(CLIENT *c, RPC_CLIENT_CREATE_VLAN *create)
 	return true;
 
 #else	// OS_WIN32
-
-	if (OS_IS_WINDOWS_9X(GetOsInfo()->OsType))
-	{
-		// Only one LAN card is available in the Win9x
-		TOKEN_LIST *t;
-
-		t = MsEnumNetworkAdapters(VLAN_ADAPTER_NAME, VLAN_ADAPTER_NAME_OLD);
-		if (t != NULL)
-		{
-			if (t->NumTokens >= 1)
-			{
-				FreeToken(t);
-				CiSetError(c, ERR_NOT_SUPPORTED);
-				return false;
-			}
-			FreeToken(t);
-		}
-	}
-
 	// Check whether the specified name is valid or not
 	if (IsSafeStr(create->DeviceName) == false)
 	{
@@ -8234,7 +8245,7 @@ bool CtCreateVLan(CLIENT *c, RPC_CLIENT_CREATE_VLAN *create)
 		return false;
 	}
 
-	max_len = MsIsNt() ? MAX_DEVICE_NAME_LEN : MAX_DEVICE_NAME_LEN_9X;
+	max_len = MAX_DEVICE_NAME_LEN;
 	if (StrLen(create->DeviceName) > max_len)
 	{
 		// Name is too long
@@ -8262,50 +8273,17 @@ bool CtCreateVLan(CLIENT *c, RPC_CLIENT_CREATE_VLAN *create)
 		return false;
 	}
 
-	if (MsIsNt())
+	// Perform the installation (Windows Vista)
+	char tmp[MAX_SIZE];
+	Format(tmp, sizeof(tmp), "instvlan %s", create->DeviceName);
+
+	if (CncExecDriverInstaller(tmp) == false)
 	{
-		if (MsIsVista() == false)
-		{
-			k = InitKakushi();
-		}
+		CiSetError(c, ERR_VLAN_INSTALL_ERROR);
+		CiNotify(c);
+		CiSendGlobalPulse(c);
+		return false;
 	}
-
-	if (MsIsVista() == false)
-	{
-		MS_DRIVER_VER ver;
-
-		CiInitDriverVerStruct(&ver);
-
-		// Perform the installation (other than Windows Vista)
-		if (MsInstallVLan(VLAN_ADAPTER_NAME_TAG, VLAN_CONNECTION_NAME, create->DeviceName, &ver) == false)
-		{
-			// Installation Failed
-			FreeKakushi(k);
-			CiSetError(c, ERR_VLAN_INSTALL_ERROR);
-			CiNotify(c);
-			CiSendGlobalPulse(c);
-			return false;
-		}
-	}
-	else
-	{
-		// Perform the installation (Windows Vista)
-		char tmp[MAX_SIZE];
-
-		Format(tmp, sizeof(tmp), "instvlan %s", create->DeviceName);
-
-		if (CncExecDriverInstaller(tmp) == false)
-		{
-			// Installation Failed
-			FreeKakushi(k);
-			CiSetError(c, ERR_VLAN_INSTALL_ERROR);
-			CiNotify(c);
-			CiSendGlobalPulse(c);
-			return false;
-		}
-	}
-
-	FreeKakushi(k);
 
 	t = MsEnumNetworkAdapters(VLAN_ADAPTER_NAME, VLAN_ADAPTER_NAME_OLD);
 	if (t->NumTokens == 1)
@@ -8340,17 +8318,6 @@ bool CtCreateVLan(CLIENT *c, RPC_CLIENT_CREATE_VLAN *create)
 	CiSendGlobalPulse(c);
 
 	CiSaveConfigurationFile(c);
-
-	if (MsIsNt() == false)
-	{
-		if (GetOsInfo()->OsType == OSTYPE_WINDOWS_ME)
-		{
-			// Show the warning in the case of Windows Me
-			MsgBox(NULL, 0x00000040L, _UU("CM_9X_VLAN_ME_MESSAGE"));
-		}
-
-		ReleaseThread(NewThread(Win9xRebootThread, NULL));
-	}
 
 	return true;
 
@@ -8621,12 +8588,6 @@ bool CtAddCa(CLIENT *c, RPC_CERT *cert)
 	// Validate arguments
 	if (c == NULL || cert == NULL)
 	{
-		return false;
-	}
-
-	if (cert->x->is_compatible_bit == false)
-	{
-		CiSetError(c, ERR_NOT_RSA_1024);
 		return false;
 	}
 
@@ -9090,6 +9051,12 @@ void CiInitConfiguration(CLIENT *c)
 		c->Config.UseKeepConnect = false;	// Don't use the connection maintenance function by default in the Client
 		// Eraser
 		c->Eraser = NewEraser(c->Logger, 0);
+
+#ifdef	OS_WIN32
+		c->Config.DisableRpcDynamicPortListener = false;
+#else	// OS_WIN32
+		c->Config.DisableRpcDynamicPortListener = true;
+#endif	// OS_WIN32
 	}
 	else
 	{
@@ -9236,7 +9203,19 @@ void CiLoadClientConfig(CLIENT_CONFIG *c, FOLDER *f)
 	c->AllowRemoteConfig = CfgGetBool(f, "AllowRemoteConfig");
 	c->KeepConnectInterval = MAKESURE(CfgGetInt(f, "KeepConnectInterval"), KEEP_INTERVAL_MIN, KEEP_INTERVAL_MAX);
 	c->NoChangeWcmNetworkSettingOnWindows8 = CfgGetBool(f, "NoChangeWcmNetworkSettingOnWindows8");
-	c->NicDownOnDisconnect = CfgGetBool(f, "NicDownOnDisconnect");
+
+	if (CfgIsItem(f, "DisableRpcDynamicPortListener"))
+	{
+		c->DisableRpcDynamicPortListener = CfgGetBool(f, "DisableRpcDynamicPortListener");
+	}
+	else
+	{
+#ifdef	OS_WIN32
+		c->DisableRpcDynamicPortListener = false;
+#else	// OS_WIN32
+		c->DisableRpcDynamicPortListener = true;
+#endif	// OS_WIN32
+	}
 }
 
 // Read the client authentication data
@@ -9295,6 +9274,20 @@ CLIENT_AUTH *CiLoadClientAuth(FOLDER *f)
 		CfgGetStr(f, "SecurePublicCertName", a->SecurePublicCertName, sizeof(a->SecurePublicCertName));
 		CfgGetStr(f, "SecurePrivateKeyName", a->SecurePrivateKeyName, sizeof(a->SecurePrivateKeyName));
 		break;
+
+	case CLIENT_AUTHTYPE_OPENSSLENGINE:
+		b = CfgGetBuf(f, "ClientCert");
+		if (b != NULL)
+		{
+			a->ClientX = BufToX(b, false);
+		}
+		FreeBuf(b);
+		if (CfgGetStr(f, "OpensslEnginePrivateKeyName", a->OpensslEnginePrivateKeyName, sizeof(a->OpensslEnginePrivateKeyName)))
+    {
+        a->ClientK = OpensslEngineToK(a->OpensslEnginePrivateKeyName, a->OpensslEngineName);
+    }
+    CfgGetStr(f, "OpensslEngineName", a->OpensslEngineName, sizeof(a->OpensslEngineName));
+		break;
 	}
 
 	return a;
@@ -9316,6 +9309,13 @@ CLIENT_OPTION *CiLoadClientOption(FOLDER *f)
 
 	CfgGetUniStr(f, "AccountName", o->AccountName, sizeof(o->AccountName));
 	CfgGetStr(f, "Hostname", o->Hostname, sizeof(o->Hostname));
+	// Extract hint string from hostname
+	UINT i = SearchStrEx(o->Hostname, "/", 0, false);
+	if (i != INFINITE)
+	{
+		StrCpy(o->HintStr, sizeof(o->HintStr), o->Hostname + i + 1);
+		o->Hostname[i] = 0;
+	}
 	o->Port = CfgGetInt(f, "Port");
 	o->PortUDP = CfgGetInt(f, "PortUDP");
 	o->ProxyType = CfgGetInt(f, "ProxyType");
@@ -9346,7 +9346,9 @@ CLIENT_OPTION *CiLoadClientOption(FOLDER *f)
 	o->DisableQoS = CfgGetBool(f, "DisableQoS");
 	o->FromAdminPack = CfgGetBool(f, "FromAdminPack");
 	o->NoUdpAcceleration = CfgGetBool(f, "NoUdpAcceleration");
-	
+	CfgGetIp(f, "BindLocalIP", &o->BindLocalIP);// Source IP address for outgoing connection
+	o->BindLocalPort = CfgGetInt(f, "BindLocalPort");// Source port number for outgoing connection
+
 	b = CfgGetBuf(f, "HostUniqueKey");
 	if (b != NULL)
 	{
@@ -9397,6 +9399,7 @@ ACCOUNT *CiLoadClientAccount(FOLDER *f)
 	a->StartupAccount = CfgGetBool(f, "StartupAccount");
 	a->CheckServerCert = CfgGetBool(f, "CheckServerCert");
 	a->RetryOnServerCert = CfgGetBool(f, "RetryOnServerCert");
+	a->AddDefaultCA = CfgGetBool(f, "AddDefaultCA");
 	a->CreateDateTime = CfgGetInt64(f, "CreateDateTime");
 	a->UpdateDateTime = CfgGetInt64(f, "UpdateDateTime");
 	a->LastConnectDateTime = CfgGetInt64(f, "LastConnectDateTime");
@@ -9566,7 +9569,7 @@ void CiLoadVLan(CLIENT *c, FOLDER *f)
 	Add(c->UnixVLanList, v);
 
 #ifdef	OS_UNIX
-	UnixVLanCreate(v->Name, v->MacAddress, !c->Config.NicDownOnDisconnect);
+	UnixVLanCreate(v->Name, v->MacAddress, false);
 #endif	// OS_UNIX
 }
 
@@ -9682,7 +9685,7 @@ bool CiReadSettingFromCfg(CLIENT *c, FOLDER *root)
 		UNIX_VLAN *uv;
 
 		// Create a Tap for MacOS X
-		if (UnixVLanCreate(CLIENT_MACOS_TAP_NAME, NULL, !c->Config.NicDownOnDisconnect) == false)
+		if (UnixVLanCreate(CLIENT_MACOS_TAP_NAME, NULL, false) == false)
 		{
 			// Fail (abort)
 			CLog(c, "LC_TAP_NOT_FOUND");
@@ -9729,12 +9732,7 @@ bool CiReadSettingFromCfg(CLIENT *c, FOLDER *root)
 		UINT ostype = GetOsInfo()->OsType;
 		// CM_SETTING
 		CM_SETTING *s = c->CmSetting;
-
-		if (OS_IS_UNIX(ostype) || OS_IS_WINDOWS_NT(ostype))
-		{
-			s->EasyMode = CfgGetBool(cmsetting, "EasyMode");
-		}
-
+		s->EasyMode = CfgGetBool(cmsetting, "EasyMode");
 		s->LockMode = CfgGetBool(cmsetting, "LockMode");
 		CfgGetByte(cmsetting, "HashedPassword", s->HashedPassword, sizeof(s->HashedPassword));
 	}
@@ -9792,7 +9790,7 @@ void CiWriteClientConfig(FOLDER *cc, CLIENT_CONFIG *config)
 	CfgAddBool(cc, "AllowRemoteConfig", config->AllowRemoteConfig);
 	CfgAddInt(cc, "KeepConnectInterval", config->KeepConnectInterval);
 	CfgAddBool(cc, "NoChangeWcmNetworkSettingOnWindows8", config->NoChangeWcmNetworkSettingOnWindows8);
-	CfgAddBool(cc, "NicDownOnDisconnect", config->NicDownOnDisconnect);
+	CfgAddBool(cc, "DisableRpcDynamicPortListener", config->DisableRpcDynamicPortListener);
 }
 
 // Write the client authentication data
@@ -9840,6 +9838,16 @@ void CiWriteClientAuth(FOLDER *f, CLIENT_AUTH *a)
 		CfgAddStr(f, "SecurePublicCertName", a->SecurePublicCertName);
 		CfgAddStr(f, "SecurePrivateKeyName", a->SecurePrivateKeyName);
 		break;
+
+	case CLIENT_AUTHTYPE_OPENSSLENGINE:
+		if (a->ClientX != NULL) {
+			b = XToBuf(a->ClientX, false);
+			CfgAddByte(f, "ClientCert", b->Buf, b->Size);
+			FreeBuf(b);
+		}
+		CfgAddStr(f, "OpensslEnginePrivateKeyName", a->OpensslEnginePrivateKeyName);
+		CfgAddStr(f, "OpensslEngineName", a->OpensslEngineName);
+	break;
 	}
 }
 
@@ -9854,7 +9862,20 @@ void CiWriteClientOption(FOLDER *f, CLIENT_OPTION *o)
 	}
 
 	CfgAddUniStr(f, "AccountName", o->AccountName);
-	CfgAddStr(f, "Hostname", o->Hostname);
+	// Append hint string to hostname
+	if (IsEmptyStr(o->HintStr))
+	{
+		// No hint
+		CfgAddStr(f, "Hostname", o->Hostname);
+	}
+	else
+	{
+		char hostname[MAX_SIZE];
+		StrCpy(hostname, sizeof(hostname), o->Hostname);
+		StrCat(hostname, sizeof(hostname), "/");
+		StrCat(hostname, sizeof(hostname), o->HintStr);
+		CfgAddStr(f, "Hostname", hostname);
+	}
 	CfgAddInt(f, "Port", o->Port);
 	CfgAddInt(f, "PortUDP", o->PortUDP);
 	CfgAddInt(f, "ProxyType", o->ProxyType);
@@ -9882,6 +9903,8 @@ void CiWriteClientOption(FOLDER *f, CLIENT_OPTION *o)
 	CfgAddBool(f, "RequireBridgeRoutingMode", o->RequireBridgeRoutingMode);
 	CfgAddBool(f, "DisableQoS", o->DisableQoS);
 	CfgAddBool(f, "NoUdpAcceleration", o->NoUdpAcceleration);
+	CfgAddIp(f, "BindLocalIP", &o->BindLocalIP);// Source IP address for outgoing connection
+	CfgAddInt(f, "BindLocalPort", o->BindLocalPort);// Source port number for outgoing connection
 
 	if (o->FromAdminPack)
 	{
@@ -10017,6 +10040,9 @@ void CiWriteAccountData(FOLDER *f, ACCOUNT *a)
 
 	// Retry on invalid server certificate flag
 	CfgAddBool(f, "RetryOnServerCert", a->RetryOnServerCert);
+
+	// Add default SSL trust store
+	CfgAddBool(f, "AddDefaultCA", a->AddDefaultCA);
 
 	// Date and time
 	CfgAddInt64(f, "CreateDateTime", a->CreateDateTime);
@@ -10411,16 +10437,6 @@ CLIENT *CiNewClient()
 	// Raise the priority
 	OSSetHighPriority();
 
-
-
-#ifdef	OS_WIN32
-	// For Win9x, release the DHCP address of all the virtual LAN card
-	if (MsIsNt() == false)
-	{
-		Win32ReleaseAllDhcp9x(true);
-	}
-#endif	// OS_WIN32
-
 	CiChangeAllVLanMacAddressIfMachineChanged(c);
 
 	CiChangeAllVLanMacAddressIfCleared(c);
@@ -10543,14 +10559,6 @@ void CiCleanupClient(CLIENT *c)
 
 	Free(c);
 
-#ifdef	OS_WIN32
-	// For Win9x, release the DHCP address of all the virtual LAN card
-	if (MsIsNt() == false)
-	{
-		Win32ReleaseAllDhcp9x(true);
-	}
-#endif	// OS_WIN32
-
 	StopCedarLog();
 
 	if (ci_active_sessions_lock != NULL)
@@ -10610,9 +10618,6 @@ void CtStartClient()
 		// It is already in running
 		return;
 	}
-
-	// OS check
-	CiCheckOs();
 
 #ifdef	OS_WIN32
 	RegistWindowsFirewallAll();
@@ -10731,27 +10736,6 @@ void CtStopClient()
 	// Release the client
 	CtReleaseClient(client);
 	client = NULL;
-}
-
-// OS check
-void CiCheckOs()
-{
-	// Get the OS type
-	OS_INFO *info = GetOsInfo();
-
-	if (OS_IS_WINDOWS(info->OsType))
-	{
-		bool ok = IS_CLIENT_SUPPORTED_OS(info->OsType);
-
-		if (ok == false)
-		{
-			Alert(
-				CEDAR_PRODUCT_STR " VPN Client doesn't support this Windows Operating System.\n"
-				CEDAR_PRODUCT_STR " VPN Client requires Windows 98, Windows Me, Windows 2000, Windows XP, Windows Server 2003 or Greater.\n\n"
-				"Please contact your system administrator.", CEDAR_PRODUCT_STR " VPN Client");
-			exit(0);
-		}
-	}
 }
 
 // Client status indicator

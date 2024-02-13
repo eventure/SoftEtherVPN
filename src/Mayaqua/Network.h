@@ -8,6 +8,28 @@
 #ifndef	NETWORK_H
 #define	NETWORK_H
 
+#include "Encrypt.h"
+#include "Mayaqua.h"
+
+#include <openssl/ssl.h> // This is needed only for the SSL/TLS version defines
+
+#ifdef OS_UNIX
+#include <netinet/in.h>
+
+#ifdef UNIX_LINUX
+#include <pthread.h>
+#endif
+
+#ifdef UNIX_OPENBSD
+#include <pthread.h>
+#endif
+
+#ifdef UNIX_MACOS
+#include <pthread.h>
+#endif
+#endif
+
+
 // Dynamic Value
 struct DYN_VALUE
 {
@@ -20,19 +42,13 @@ struct DYN_VALUE
 
 #define	MAX_HOST_NAME_LEN			255		// Maximum length of the host name
 
-#define	TIMEOUT_GETIP				2300
-
 #define	TIMEOUT_INFINITE			(0x7fffffff)
 #define	TIMEOUT_TCP_PORT_CHECK		(10 * 1000)
 #define	TIMEOUT_SSL_CONNECT			(15 * 1000)
 
-#define	TIMEOUT_HOSTNAME			(500)
 #define	TIMEOUT_NETBIOS_HOSTNAME	(100)
-#define	EXPIRES_HOSTNAME			(10 * 60 * 1000)
 
 #define	SOCKET_BUFFER_SIZE			0x10000000
-
-#define	IPV6_DUMMY_FOR_IPV4			0xFEFFFFDF
 
 #define	UDPLISTENER_CHECK_INTERVAL	1000ULL
 #define	UDPLISTENER_WAIT_INTERVAL	1234
@@ -40,12 +56,6 @@ struct DYN_VALUE
 #define	UDP_MAX_MSG_SIZE_DEFAULT	65507
 
 #define	MAX_NUM_IGNORE_ERRORS		1024
-
-#ifndef	USE_STRATEGY_LOW_MEMORY
-#define	DEFAULT_GETIP_THREAD_MAX_NUM		512
-#else	// USE_STRATEGY_LOW_MEMORY
-#define	DEFAULT_GETIP_THREAD_MAX_NUM		64
-#endif	// USE_STRATEGY_LOW_MEMORY
 
 #define	DEFAULT_CIPHER_LIST			"ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:ECDHE+AES256:DHE+AES256:RSA+AES"
 
@@ -78,16 +88,18 @@ struct DYN_VALUE
 // IP address
 struct IP
 {
-	UCHAR addr[4];					// IPv4 address, (meaning that 192.0.2.254 = IPv6)
-	UCHAR ipv6_addr[16];			// IPv6 address
-	UINT ipv6_scope_id;				// IPv6 scope ID
+	BYTE address[16];   // IP address (RFC 3493 format used for IPv4)
+	UINT ipv6_scope_id; // IPv6 scope ID
 };
 
-// Size when comparing the IP structures only in the address part
-#define	SIZE_OF_IP_FOR_ADDR			(sizeof(UCHAR) * 20)
+// Pointer to the beginning of the IPv4 address
+#define	IPV4(address)				(&address[12])
+#define	IPV4_SIZE					(4)
 
-// Compare the IP address part
-#define	CmpIpAddr(ip1, ip2)			(Cmp((ip1), (ip2), SIZE_OF_IP_FOR_ADDR))
+#define	CmpIpAddr(ip1, ip2)			(Cmp((ip1)->address, (ip2)->address, sizeof((ip1)->address)))
+
+#define	IsIP6(ip)					(ip && IsIP4(ip) == false)
+#define	IsZeroIp(ip)				(IsZeroIP(ip))
 
 // IPv6 address (different format)
 struct IPV6_ADDR
@@ -105,14 +117,6 @@ struct IPV6_ADDR
 #define IPV6_ADDR_SOLICIATION_MULTICAST			64	// Solicited-node multicast
 #define	IPV6_ADDR_ZERO							128	// All zeros
 #define	IPV6_ADDR_LOOPBACK						256	// Loop-back
-
-
-// DNS cache list
-struct DNSCACHE
-{
-	char *HostName;
-	IP IpAddress;
-};
 
 // Client list
 struct IP_CLIENT
@@ -147,6 +151,9 @@ struct SSL_ACCEPT_SETTINGS
 	bool Tls_Disable1_0;
 	bool Tls_Disable1_1;
 	bool Tls_Disable1_2;
+	bool Tls_Disable1_3;
+	bool Override_Security_Level;
+	UINT Override_Security_Level_Value;
 };
 
 // Socket
@@ -289,9 +296,10 @@ struct ROUTE_ENTRY
 	bool LocalRouting;
 	bool PPPConnection;
 	UINT Metric;
-	UINT OldIfMetric;
+	UINT IfMetric;
 	UINT InterfaceID;
 	UINT64 InnerScore;
+	bool Active;
 };
 
 // Routing table
@@ -315,15 +323,6 @@ struct ICMP_RESULT
 	UINT Rtt;										// Round Trip Time
 	IP IpAddress;									// IP address
 };
-
-
-// Host name cache list
-typedef struct HOSTCACHE
-{
-	UINT64 Expires;							// Expiration
-	IP IpAddress;							// IP address
-	char HostName[256];						// Host name
-} HOSTCACHE;
 
 // NETBIOS name requests
 typedef struct NBTREQUEST
@@ -357,23 +356,12 @@ typedef struct SOCKLIST
 
 
 // Parameters for timeout thread for Solaris
-typedef struct SOCKET_TIMEOUT_PARAM{
+typedef struct SOCKET_TIMEOUT_PARAM {
 	SOCK *sock;
 	CANCEL *cancel;
 	THREAD *thread;
 	bool unblocked;
 } SOCKET_TIMEOUT_PARAM;
-
-// Parameters for GetIP thread
-struct GETIP_THREAD_PARAM
-{
-	REF *Ref;
-	char HostName[MAX_PATH];
-	bool IPv6;
-	UINT Timeout;
-	IP Ip;
-	bool Ok;
-};
 
 // Parameters for the IP address release thread
 struct WIN32_RELEASEADDRESS_THREAD_PARAM
@@ -436,6 +424,7 @@ struct TUBE
 	bool IsInFlushList;					// Whether it is registered in the Tube Flush List
 	void *Param1, *Param2, *Param3;
 	UINT IntParam1, IntParam2, IntParam3;
+	UINT64 DataTimeout;
 };
 
 // Data that is to send and to receive in the tube
@@ -554,6 +543,7 @@ struct SSL_PIPE
 {
 	bool ServerMode;					// Whether it's in the server mode
 	bool IsDisconnected;				// Disconnected
+	int SslVersion;
 	SSL *ssl;							// SSL object
 	struct ssl_ctx_st *ssl_ctx;			// SSL_CTX
 	SSL_BIO *SslInOut;					// I/O BIO for the data in the SSL tunnel
@@ -651,7 +641,7 @@ struct RUDP_SESSION
 	UINT64 Magic_Disconnect;			// Disconnection Signal
 	UINT64 NextSendSeqNo;				// Transmission sequence number to be used next
 	UINT64 LastRecvCompleteSeqNo;		// Sequence number of receiving complete
-										// (This indicates all segments which have sequence number up to this number are received completely)
+	// (This indicates all segments which have sequence number up to this number are received completely)
 	UCHAR NextIv[SHA1_SIZE];			// IV value to be used next
 	UINT NextKeepAliveInterval;			// Interval value of KeepAlive to be used next
 	FIFO *RecvFifo;						// Reception FIFO
@@ -818,6 +808,37 @@ struct RUDP_STACK
 	USHORT Client_IcmpId, Client_IcmpSeqNo;	// Sequence number and ICMP ID that is randomly generated on the client side
 };
 
+// Data for the thread for serial connection attempts to a list of addresses
+struct CONNECT_SERIAL_PARAM
+{
+	LIST *IpList;
+	UINT LocalPort;						// Local port number to bind
+	IP   *LocalIP;						// Local IP address to bind. NULL address allowed to use.
+	IP   LocalIP_Cache;					// Local IP address to bind
+	UINT Port;
+	UINT Timeout;
+	char Hostname[MAX_SIZE];
+	char HintStr[MAX_SIZE];
+	bool No_Get_Hostname;
+	bool *CancelFlag;
+	bool *NoDelayFlag;
+	UINT *NatT_ErrorCode;
+	char NatT_SvcName[MAX_SIZE];
+	SOCK *Sock;
+	bool Finished;
+	bool Ok;
+	UINT64 FinishedTick;
+	EVENT *FinishEvent;
+	UINT Delay;
+	UINT RetryDelay;
+	bool Tcp_TryStartSsl;
+	SSL_VERIFY_OPTION *SslOption;
+	UINT *SslErr;
+	bool Use_NatT;
+	bool Force_NatT;
+	IP *Ret_Ip;
+};
+
 // Data for the thread for concurrent connection attempts for the R-UDP and TCP
 struct CONNECT_TCP_RUDP_PARAM
 {
@@ -839,14 +860,26 @@ struct CONNECT_TCP_RUDP_PARAM
 	UINT RUdpProtocol;
 	UINT Delay;
 	bool Tcp_TryStartSsl;
+	SSL_VERIFY_OPTION *SslOption;
+	UINT *SslErr;
 	LOCK *CancelLock;
 	SOCK *CancelDisconnectSock;
 	bool Tcp_InNegotiation;
 };
 
+struct SSL_VERIFY_OPTION
+{
+	bool VerifyPeer;				// Whether to verify SSL peer
+	bool PromptOnVerifyFail;		// Prompt on verification failure (Windows)
+	bool AddDefaultCA;				// Use default trust store
+	bool VerifyHostname;			// Verify server hostname
+	LIST *CaList;					// Trusted CA list
+	X *SavedCert;					// Saved server certificate
+};
+
 #define	SSL_DEFAULT_CONNECT_TIMEOUT		(15 * 1000)		// SSL default timeout
 
-// Header for TCP Pair 
+// Header for TCP Pair
 struct TCP_PAIR_HEADER
 {
 	bool EnableHMac;
@@ -888,7 +921,6 @@ bool GetSniNameFromSslPacket(UCHAR *packet_buf, UINT packet_size, char *sni, UIN
 
 void SetDhParam(DH_CTX *dh);
 
-bool IsUseDnsProxy();
 bool IsUseAlternativeHostname();
 
 #ifdef	OS_WIN32
@@ -919,6 +951,13 @@ bool DetectIsServerSoftEtherVPN(SOCK *s);
 void ConnectThreadForTcp(THREAD *thread, void *param);
 void ConnectThreadForRUDP(THREAD *thread, void *param);
 void ConnectThreadForOverDnsOrIcmp(THREAD *thread, void *param);
+void ConnectThreadForIPv4(THREAD *thread, void *param);
+void ConnectThreadForIPv6(THREAD *thread, void *param);
+
+void BindConnectThreadForIPv4(THREAD *thread, void *param);
+void BindConnectThreadForIPv6(THREAD *thread, void *param);
+
+SOCK *CreateTCPSock(SOCKET s, bool is_ipv6, IP *current_ip, bool no_get_hostname, char *hostname_original);
 SOCK *NewRUDPClientNatT(char *svc_name, IP *ip, UINT *error_code, UINT timeout, bool *cancel, char *hint_str, char *target_hostname);
 RUDP_STACK *NewRUDPServer(char *svc_name, RUDP_STACK_INTERRUPTS_PROC *proc_interrupts, RUDP_STACK_RPC_RECV_PROC *proc_rpc_recv, void *param, UINT port, bool no_natt_register, bool over_dns_mode, volatile UINT *natt_global_udp_port, UCHAR rand_port_id, IP *listen_ip);
 SOCK *NewRUDPClientDirect(char *svc_name, IP *ip, UINT port, UINT *error_code, UINT timeout, bool *cancel, SOCK *sock, SOCK_EVENT *sock_event, UINT local_port, bool over_dns_mode);
@@ -949,7 +988,7 @@ UINT64 RUDPGetCurrentSendingMinSeqNo(RUDP_SESSION *se);
 UINT64 RUDPGetCurrentSendingMaxSeqNo(RUDP_SESSION *se);
 SOCK *ListenRUDP(char *svc_name, RUDP_STACK_INTERRUPTS_PROC *proc_interrupts, RUDP_STACK_RPC_RECV_PROC *proc_rpc_recv, void *param, UINT port, bool no_natt_register, bool over_dns_mode);
 SOCK *ListenRUDPEx(char *svc_name, RUDP_STACK_INTERRUPTS_PROC *proc_interrupts, RUDP_STACK_RPC_RECV_PROC *proc_rpc_recv, void *param, UINT port, bool no_natt_register, bool over_dns_mode,
-				   volatile UINT *natt_global_udp_port, UCHAR rand_port_id, IP *listen_ip);
+                   volatile UINT *natt_global_udp_port, UCHAR rand_port_id, IP *listen_ip);
 SOCK *AcceptRUDP(SOCK *s);
 void *InitWaitUntilHostIPAddressChanged();
 void FreeWaitUntilHostIPAddressChanged(void *p);
@@ -973,7 +1012,7 @@ void RUDPAddIpToValidateList(RUDP_STACK *r, IP *ip);
 bool GetBestLocalIpForTarget(IP *local_ip, IP *target_ip);
 SOCK *NewUDP4ForSpecificIp(IP *target_ip, UINT port);
 
-#ifdef	OS_WIN32
+#ifdef OS_WIN32
 
 // Function prototype for Win32
 void Win32InitSocketLibrary();
@@ -982,14 +1021,12 @@ void Win32Select(SOCKSET *set, UINT timeout, CANCEL *c1, CANCEL *c2);
 void Win32InitAsyncSocket(SOCK *sock);
 void Win32JoinSockToSockEvent(SOCK *sock, SOCK_EVENT *event);
 void Win32FreeAsyncSocket(SOCK *sock);
-void Win32IpForwardRowToRouteEntry(ROUTE_ENTRY *entry, void *ip_forward_row);
-void Win32RouteEntryToIpForwardRow(void *ip_forward_row, ROUTE_ENTRY *entry);
+void Win32IpForwardRow2ToRouteEntry(ROUTE_ENTRY *entry, void *ip_forward_row);
+void Win32RouteEntryToIpForwardRow2(void *ip_forward_row, ROUTE_ENTRY *entry);
 int Win32CompareRouteEntryByMetric(void *p1, void *p2);
-ROUTE_TABLE *Win32GetRouteTable();
-bool Win32AddRouteEntry(ROUTE_ENTRY *e, bool *already_exists);
-void Win32DeleteRouteEntry(ROUTE_ENTRY *e);
-void Win32UINTToIP(IP *ip, UINT i);
-UINT Win32IPToUINT(IP *ip);
+ROUTE_TABLE *Win32GetRouteTable2(bool ipv4, bool ipv6);
+bool Win32AddRouteEntry2(ROUTE_ENTRY *e, bool *already_exists);
+void Win32DeleteRouteEntry2(ROUTE_ENTRY *e);
 UINT Win32GetVLanInterfaceID(char *instance_name);
 char **Win32EnumVLan(char *tag_name);
 void Win32Cancel(CANCEL *c);
@@ -1001,13 +1038,11 @@ void Win32CleanupSockEvent(SOCK_EVENT *event);
 bool Win32WaitSockEvent(SOCK_EVENT *event, UINT timeout);
 bool Win32GetDefaultDns(IP *ip, char *domain, UINT size);
 bool Win32GetDnsSuffix(char *domain, UINT size);
-void Win32RenewDhcp9x(UINT if_id);
-void Win32ReleaseDhcp9x(UINT if_id, bool wait);
 void Win32FlushDnsCache();
 int CompareIpAdapterIndexMap(void *p1, void *p2);
-ROUTE_CHANGE *Win32NewRouteChange();
-void Win32FreeRouteChange(ROUTE_CHANGE *r);
-bool Win32IsRouteChanged(ROUTE_CHANGE *r);
+ROUTE_CHANGE *Win32NewRouteChange2(bool ipv4, bool ipv6, void *callback);
+void Win32FreeRouteChange2(ROUTE_CHANGE *r);
+bool Win32IsRouteChanged2(ROUTE_CHANGE *r);
 bool Win32GetAdapterFromGuid(void *a, char *guid);
 SOCKET Win32Accept(SOCK *sock, SOCKET s, struct sockaddr *addr, int *addrlen, bool ipv6);
 
@@ -1055,18 +1090,7 @@ void UnixSetSocketNonBlockingMode(int fd, bool nonblock);
 // Function prototype
 void InitNetwork();
 void FreeNetwork();
-void InitDnsCache();
-void FreeDnsCache();
-void LockDnsCache();
-void UnlockDnsCache();
-int CompareDnsCache(void *p1, void *p2);
-void GenDnsCacheKeyName(char *dst, UINT size, char *src, bool ipv6);
-void NewDnsCacheEx(char *hostname, IP *ip, bool ipv6);
-DNSCACHE *FindDnsCacheEx(char *hostname, bool ipv6);
-bool QueryDnsCacheEx(IP *ip, char *hostname, bool ipv6);
-void NewDnsCache(char *hostname, IP *ip);
-DNSCACHE *FindDnsCache(char *hostname);
-bool QueryDnsCache(IP *ip, char *hostname);
+
 void InAddrToIP(IP *ip, struct in_addr *addr);
 void InAddrToIP6(IP *ip, struct in6_addr *addr);
 void IPToInAddr(struct in_addr *addr, IP *ip);
@@ -1075,29 +1099,11 @@ bool StrToIP(IP *ip, char *str);
 UINT StrToIP32(char *str);
 UINT UniStrToIP32(wchar_t *str);
 void IPToStr(char *str, UINT size, IP *ip);
-void IPToStr4(char *str, UINT size, IP *ip);
 void IPToStr32(char *str, UINT size, UINT ip);
 void IPToStr4or6(char *str, UINT size, UINT ip_4_uint, UCHAR *ip_6_bytes);
 void IPToUniStr(wchar_t *str, UINT size, IP *ip);
 void IPToUniStr32(wchar_t *str, UINT size, UINT ip);
-bool GetIPEx(IP *ip, char *hostname, bool ipv6);
-bool GetIP46Ex(IP *ip4, IP *ip6, char *hostname, UINT timeout, bool *cancel);
-bool GetIP(IP *ip, char *hostname);
-bool GetIP4(IP *ip, char *hostname);
-bool GetIP6(IP *ip, char *hostname);
-bool GetIP4Ex(IP *ip, char *hostname, UINT timeout, bool *cancel);
-bool GetIP6Ex(IP *ip, char *hostname, UINT timeout, bool *cancel);
-bool GetIP4Ex6Ex(IP *ip, char *hostname, UINT timeout, bool ipv6, bool *cancel);
-bool GetIP4Ex6Ex2(IP *ip, char *hostname, UINT timeout, bool ipv6, bool *cancel, bool only_direct_dns);
-void GetIP4Ex6ExThread(THREAD *t, void *param);
-void ReleaseGetIPThreadParam(GETIP_THREAD_PARAM *p);
-void CleanupGetIPThreadParam(GETIP_THREAD_PARAM *p);
-bool GetIP4Inner(IP *ip, char *hostname);
-bool GetIP6Inner(IP *ip, char *hostname);
-bool GetHostNameInner(char *hostname, UINT size, IP *ip);
-bool GetHostNameInner6(char *hostname, UINT size, IP *ip);
 bool GetHostName(char *hostname, UINT size, IP *ip);
-void GetHostNameThread(THREAD *t, void *p);
 void GetMachineName(char *name, UINT size);
 void GetMachineNameEx(char *name, UINT size, bool no_load_hosts);
 bool GetMachineNameFromHosts(char *name, UINT size);
@@ -1112,7 +1118,16 @@ SOCK *ConnectEx(char *hostname, UINT port, UINT timeout);
 SOCK *ConnectEx2(char *hostname, UINT port, UINT timeout, bool *cancel_flag);
 SOCK *ConnectEx3(char *hostname, UINT port, UINT timeout, bool *cancel_flag, char *nat_t_svc_name, UINT *nat_t_error_code, bool try_start_ssl, bool no_get_hostname);
 SOCK *ConnectEx4(char *hostname, UINT port, UINT timeout, bool *cancel_flag, char *nat_t_svc_name, UINT *nat_t_error_code, bool try_start_ssl, bool no_get_hostname, IP *ret_ip);
+SOCK *ConnectEx5(char *hostname, UINT port, UINT timeout, bool *cancel_flag, char *nat_t_svc_name, UINT *nat_t_error_code, bool try_start_ssl, bool no_get_hostname, SSL_VERIFY_OPTION *ssl_option, UINT *ssl_err, char *hint_str, IP *ret_ip);
 SOCKET ConnectTimeoutIPv4(IP *ip, UINT port, UINT timeout, bool *cancel_flag);
+
+// New function named with prefix "Bind" binds outgoing connection to a specific address. New one is wrapped in original one.
+#define	BIND_LOCALIP_NULL			NULL		// NULL IP address specifies no binding
+#define	BIND_LOCALPORT_NULL			0			// NULL port number specifies no binding
+SOCK *BindConnectEx4(IP *localIP, UINT localport, char *hostname, UINT port, UINT timeout, bool *cancel_flag, char *nat_t_svc_name, UINT *nat_t_error_code, bool try_start_ssl, bool no_get_hostname, IP *ret_ip);
+SOCK *BindConnectEx5(IP *localIP, UINT localport, char *hostname, UINT port, UINT timeout, bool *cancel_flag, char *nat_t_svc_name, UINT *nat_t_error_code, bool try_start_ssl, bool no_get_hostname, SSL_VERIFY_OPTION *ssl_option, UINT *ssl_err, char *hint_str, IP *ret_ip);
+SOCKET BindConnectTimeoutIPv4(IP *localIP, UINT localport, IP *ip, UINT port, UINT timeout, bool *cancel_flag);
+
 bool SetSocketBufferSize(SOCKET s, bool send, UINT size);
 UINT SetSocketBufferSizeWithBestEffort(SOCKET s, bool send, UINT size);
 void InitUdpSocketBufferSize(SOCKET s);
@@ -1124,6 +1139,7 @@ SOCK *ListenEx(UINT port, bool local_only);
 SOCK *ListenEx2(UINT port, bool local_only, bool enable_ca, IP *listen_ip);
 SOCK *ListenEx6(UINT port, bool local_only);
 SOCK *ListenEx62(UINT port, bool local_only, bool enable_ca);
+SOCK *ListenEx63(UINT port, bool local_only, bool enable_ca, IP *listen_ip);
 SOCK *Accept(SOCK *sock);
 SOCK *Accept6(SOCK *sock);
 UINT Send(SOCK *sock, void *data, UINT size, bool secure);
@@ -1134,6 +1150,8 @@ UINT SecureSend(SOCK *sock, void *data, UINT size);
 UINT SecureRecv(SOCK *sock, void *data, UINT size);
 bool StartSSL(SOCK *sock, X *x, K *priv);
 bool StartSSLEx(SOCK *sock, X *x, K *priv, UINT ssl_timeout, char *sni_hostname);
+bool StartSSLEx2(SOCK *sock, X *x, K *priv, LIST *chain, UINT ssl_timeout, char *sni_hostname);
+bool StartSSLEx3(SOCK *sock, X *x, K *priv, LIST *chain, UINT ssl_timeout, char *sni_hostname, SSL_VERIFY_OPTION *ssl_option, UINT *ssl_err);
 bool AddChainSslCert(struct ssl_ctx_st *ctx, X *x);
 void AddChainSslCertOnDirectory(struct ssl_ctx_st *ctx);
 bool SendAll(SOCK *sock, void *data, UINT size, bool secure);
@@ -1202,11 +1220,6 @@ void InitWaitThread();
 void FreeWaitThread();
 void AddWaitThread(THREAD *t);
 void DelWaitThread(THREAD *t);
-void InitHostCache();
-void FreeHostCache();
-int CompareHostCache(void *p1, void *p2);
-void AddHostCache(IP *ip, char *hostname);
-bool GetHostCache(char *hostname, UINT size, IP *ip);
 bool IsSubnetMask(IP *ip);
 bool IsSubnetMask4(IP *ip);
 bool IsSubnetMask32(UINT ip);
@@ -1214,7 +1227,6 @@ bool IsNetworkAddress4(IP *ip, IP *mask);
 bool IsNetworkAddress32(UINT ip, UINT mask);
 bool IsHostIPAddress4(IP *ip);
 bool IsHostIPAddress32(UINT ip);
-bool IsZeroIp(IP *ip);
 bool IsZeroIP(IP *ip);
 bool IsZeroIP6Addr(IPV6_ADDR *addr);
 UINT IntToSubnetMask32(UINT i);
@@ -1225,6 +1237,7 @@ SOCKLIST *NewSockList();
 void StopSockList(SOCKLIST *sl);
 void FreeSockList(SOCKLIST *sl);
 bool IsIPv6Supported();
+bool HasIPv6Address();
 void SetSockTos(SOCK *s, int tos);
 void SetSockHighPriority(SOCK *s, bool flag);
 void InitIpClientList();
@@ -1236,9 +1249,6 @@ IP_CLIENT *SearchIpClient(IP *ip);
 UINT GetNumIpClient(IP *ip);
 void SetLinuxArpFilter();
 int connect_timeout(SOCKET s, struct sockaddr *addr, int size, int timeout, bool *cancel_flag);
-void EnableNetworkNameCache();
-void DisableNetworkNameCache();
-bool IsNetworkNameCacheEnabled();
 ROUTE_CHANGE *NewRouteChange();
 void FreeRouteChange(ROUTE_CHANGE *r);
 bool IsRouteChanged(ROUTE_CHANGE *r);
@@ -1261,7 +1271,6 @@ SOCKET_TIMEOUT_PARAM *NewSocketTimeout(SOCK *sock);
 void FreeSocketTimeout(SOCKET_TIMEOUT_PARAM *ttp);
 
 void CopyIP(IP *dst, IP *src);
-bool IsIP6(IP *ip);
 bool IsIP4(IP *ip);
 void IPv6AddrToIP(IP *ip, IPV6_ADDR *addr);
 bool IPToIPv6Addr(IPV6_ADDR *addr, IP *ip);
@@ -1271,7 +1280,6 @@ void GetLocalHostIP4(IP *ip);
 bool IsLocalHostIP6(IP *ip);
 bool IsLocalHostIP4(IP *ip);
 bool IsLocalHostIP(IP *ip);
-void ZeroIP6(IP *ip);
 void ZeroIP4(IP *ip);
 bool CheckIPItemStr6(char *str);
 void IPItemStrToChars6(UCHAR *chars, char *str);
@@ -1289,6 +1297,7 @@ void GetLoopbackAddress6(IP *ip);
 UINT GetIPAddrType6(IP *ip);
 UINT GetIPv6AddrType(IPV6_ADDR *addr);
 void GetPrefixAddress6(IP *dst, IP *ip, IP *subnet);
+bool IsInSameNetwork(IP *a1, IP *a2, IP *subnet);
 bool IsInSameNetwork6(IP *a1, IP *a2, IP *subnet);
 bool IsInSameNetwork6ByStr(char *ip1, char *ip2, char *subnet);
 void GenerateEui64Address6(UCHAR *dst, UCHAR *mac);
@@ -1301,6 +1310,15 @@ bool IsStrIPv6Address(char *str);
 void IPAnd4(IP *dst, IP *a, IP *b);
 bool IsInSameNetwork4(IP *a1, IP *a2, IP *subnet);
 bool IsInSameNetwork4Standard(IP *a1, IP *a2);
+
+// Utility functions about IP and MAC address types
+bool IsValidUnicastIPAddress4(IP *ip);
+bool IsValidUnicastIPAddressUINT4(UINT ip);
+bool IsValidUnicastIPAddress6(IP *ip);
+bool IsMacUnicast(UCHAR *mac);
+bool IsMacBroadcast(UCHAR *mac);
+bool IsMacMulticast(UCHAR *mac);
+bool IsMacInvalid(UCHAR *mac);
 
 bool ParseIpAndSubnetMask4(char *src, UINT *ip, UINT *mask);
 bool ParseIpAndSubnetMask46(char *src, IP *ip, IP *mask);
@@ -1357,6 +1375,7 @@ UINT64 GetHostIPAddressListHash();
 UDPLISTENER *NewUdpListener(UDPLISTENER_RECV_PROC *recv_proc, void *param, IP *listen_ip);
 UDPLISTENER *NewUdpListenerEx(UDPLISTENER_RECV_PROC *recv_proc, void *param, IP *listen_ip, UINT packet_type);
 void UdpListenerThread(THREAD *thread, void *param);
+void StopUdpListener(UDPLISTENER *u);
 void FreeUdpListener(UDPLISTENER *u);
 void AddPortToUdpListener(UDPLISTENER *u, UINT port);
 void DeletePortFromUdpListener(UDPLISTENER *u, UINT port);
@@ -1390,7 +1409,6 @@ void InjectNewReverseSocketToAccept(SOCK *listen_sock, SOCK *s, IP *client_ip, U
 bool NewTcpPair(SOCK **s1, SOCK **s2);
 SOCK *ListenAnyPortEx2(bool local_only, bool disable_ca);
 
-bool IsIcmpApiSupported();
 ICMP_RESULT *IcmpApiEchoSend(IP *dest_ip, UCHAR ttl, UCHAR *data, UINT size, UINT timeout);
 void IcmpApiFreeResult(ICMP_RESULT *ret);
 
@@ -1410,6 +1428,8 @@ struct SslClientCertInfo {
 
 SSL_PIPE *NewSslPipe(bool server_mode, X *x, K *k, DH_CTX *dh);
 SSL_PIPE *NewSslPipeEx(bool server_mode, X *x, K *k, DH_CTX *dh, bool verify_peer, struct SslClientCertInfo *clientcert);
+SSL_PIPE *NewSslPipeEx2(bool server_mode, X *x, K *k, LIST *chain, DH_CTX *dh, bool verify_peer, struct SslClientCertInfo *clientcert);
+SSL_PIPE* NewSslPipeEx3(bool server_mode, X* x, K* k, LIST* chain, DH_CTX* dh, bool verify_peer, struct SslClientCertInfo* clientcert, int tls13ticketscnt, bool disableTls13);
 void FreeSslPipe(SSL_PIPE *s);
 bool SyncSslPipe(SSL_PIPE *s);
 
@@ -1437,6 +1457,7 @@ void RefreshLocalMacAddressList();
 
 struct ssl_ctx_st *NewSSLCtx(bool server_mode);
 void FreeSSLCtx(struct ssl_ctx_st *ctx);
+UINT GetOSSecurityLevel();
 
 void SetCurrentDDnsFqdn(char *name);
 void GetCurrentDDnsFqdn(char *name, UINT size);
@@ -1448,10 +1469,6 @@ void QueryIpThreadMain(THREAD *thread, void *param);
 QUERYIPTHREAD *NewQueryIpThread(char *hostname, UINT interval_last_ok, UINT interval_last_ng);
 bool GetQueryIpThreadResult(QUERYIPTHREAD *t, IP *ip);
 void FreeQueryIpThread(QUERYIPTHREAD *t);
-
-void SetGetIpThreadMaxNum(UINT num);
-UINT GetGetIpThreadMaxNum();
-UINT GetCurrentGetIpThreadNum();
 
 #ifdef	OS_WIN32
 LIST *Win32GetNicList();

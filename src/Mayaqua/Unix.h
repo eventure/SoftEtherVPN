@@ -10,6 +10,8 @@
 #ifndef	UNIX_H
 #define	UNIX_H
 
+#include "OS.h"
+
 // Constants
 #define	UNIX_THREAD_STACK_SIZE			(200 * 1000)	// Stack size
 #define	UNIX_MAX_CHILD_PROCESSES		2000000			// Maximum number of child processes
@@ -115,6 +117,7 @@ void UnixSetThreadPriorityRealtime();
 void UnixSetResourceLimit(UINT id, UINT64 value);
 bool UnixIs64BitRlimSupported();
 UINT64 UnixGetTick64();
+UINT64 UnixGetHighresTickNano64(bool raw);
 void UnixSigChldHandler(int sig);
 void UnixCloseIO();
 void UnixGetCurrentDir(char *dir, UINT size);

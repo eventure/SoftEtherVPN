@@ -5,16 +5,14 @@
 // Pack.c
 // Data package code
 
-#include <GlobalConst.h>
+#include "Pack.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <wchar.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
-#include <Mayaqua/Mayaqua.h>
+#include "Encrypt.h"
+#include "Internat.h"
+#include "Mayaqua.h"
+#include "Memory.h"
+#include "Network.h"
+#include "Str.h"
 
 // Get a list of the element names in the PACK
 TOKEN_LIST *GetPackElementNames(PACK *p)
@@ -872,6 +870,50 @@ X *PackGetX(PACK *p, char *name)
 	return x;
 }
 
+// Get the X chain from the PACK
+LIST *PackGetXList(PACK *p, char *name)
+{
+	X *x;
+	BUF *b;
+	LIST *chain;
+	UINT i;
+	// Validate arguments
+	if (p == NULL || name == NULL)
+	{
+		return NULL;
+	}
+
+	ELEMENT *e = GetElement(p, name, VALUE_DATA);
+	if (e == NULL)
+	{
+		return NULL;
+	}
+
+	chain = NewList(NULL);
+	for (i = 0;i < e->num_value;i++)
+	{
+		b = PackGetBufEx(p, name, i);
+		if (b == NULL)
+		{
+			FreeXList(chain);
+			return NULL;
+		}
+
+		x = BufToX(b, false);
+
+		if (x == NULL)
+		{
+			x = BufToX(b, true);
+		}
+
+		FreeBuf(b);
+
+		Add(chain, x);
+	}
+
+	return chain;
+}
+
 // Add the K to the PACK
 ELEMENT *PackAddK(PACK *p, char *name, K *k)
 {
@@ -914,6 +956,36 @@ ELEMENT *PackAddX(PACK *p, char *name, X *x)
 
 	e = PackAddBuf(p, name, b);
 	FreeBuf(b);
+
+	return e;
+}
+
+// Add an X chain into the PACK
+ELEMENT *PackAddXList(PACK *p, char *name, LIST *chain)
+{
+	BUF *b;
+	X *x;
+	ELEMENT *e = NULL;
+	// Validate arguments
+	if (p == NULL || name == NULL || chain == NULL)
+	{
+		return NULL;
+	}
+
+	UINT i;
+	for (i = 0;i < LIST_NUM(chain);i++)
+	{
+		x = LIST_DATA(chain, i);
+		b = XToBuf(x, false);
+
+		if (b == NULL)
+		{
+			return NULL;
+		}
+
+		e = PackAddBufEx(p, name, b, i, LIST_NUM(chain));
+		FreeBuf(b);
+	}
 
 	return e;
 }
@@ -1185,7 +1257,6 @@ void PackAddIpEx(PACK *p, char *name, IP *ip, UINT index, UINT total)
 void PackAddIpEx2(PACK *p, char *name, IP *ip, UINT index, UINT total, bool is_single)
 {
 	UINT i;
-	bool b = false;
 	char tmp[MAX_PATH];
 	ELEMENT *e;
 	// Validate arguments
@@ -1198,44 +1269,20 @@ void PackAddIpEx2(PACK *p, char *name, IP *ip, UINT index, UINT total, bool is_s
 		is_single = false;
 	}
 
-	b = IsIP6(ip);
-
 	Format(tmp, sizeof(tmp), "%s@ipv6_bool", name);
-	e = PackAddBoolEx(p, tmp, b, index, total);
+	e = PackAddBoolEx(p, tmp, IsIP6(ip), index, total);
 	if (e != NULL && is_single) e->JsonHint_IsArray = false;
 	if (e != NULL) e->JsonHint_IsIP = true;
 
 	Format(tmp, sizeof(tmp), "%s@ipv6_array", name);
-	if (b)
-	{
-		e = PackAddDataEx(p, tmp, ip->ipv6_addr, sizeof(ip->ipv6_addr), index, total);
-		if (e != NULL && is_single) e->JsonHint_IsArray = false;
-		if (e != NULL) e->JsonHint_IsIP = true;
-	}
-	else
-	{
-		UCHAR dummy[16];
-
-		Zero(dummy, sizeof(dummy));
-
-		e = PackAddDataEx(p, tmp, dummy, sizeof(dummy), index, total);
-		if (e != NULL && is_single) e->JsonHint_IsArray = false;
-		if (e != NULL) e->JsonHint_IsIP = true;
-	}
+	e = PackAddDataEx(p, tmp, ip->address, sizeof(ip->address), index, total);
+	if (e != NULL && is_single) e->JsonHint_IsArray = false;
+	if (e != NULL) e->JsonHint_IsIP = true;
 
 	Format(tmp, sizeof(tmp), "%s@ipv6_scope_id", name);
-	if (b)
-	{
-		e = PackAddIntEx(p, tmp, ip->ipv6_scope_id, index, total);
-		if (e != NULL && is_single) e->JsonHint_IsArray = false;
-		if (e != NULL) e->JsonHint_IsIP = true;
-	}
-	else
-	{
-		e = PackAddIntEx(p, tmp, 0, index, total);
-		if (e != NULL && is_single) e->JsonHint_IsArray = false;
-		if (e != NULL) e->JsonHint_IsIP = true;
-	}
+	e = PackAddIntEx(p, tmp, ip->ipv6_scope_id, index, total);
+	if (e != NULL && is_single) e->JsonHint_IsArray = false;
+	if (e != NULL) e->JsonHint_IsIP = true;
 
 	i = IPToUINT(ip);
 
@@ -1427,6 +1474,28 @@ bool PackGetStrEx(PACK *p, char *name, char *str, UINT size, UINT index)
 
 	StrCpy(str, size, GetStrValue(e, index));
 	return true;
+}
+
+// Get the string size from the PACK
+UINT PackGetStrSize(PACK *p, char *name)
+{
+	return PackGetStrSizeEx(p, name, 0);
+}
+UINT PackGetStrSizeEx(PACK *p, char *name, UINT index)
+{
+	ELEMENT *e;
+	// Validate arguments
+	if (p == NULL || name == NULL)
+	{
+		return 0;
+	}
+
+	e = GetElement(p, name, VALUE_STR);
+	if (e == NULL)
+	{
+		return 0;
+	}
+	return GetDataValueSize(e, index);
 }
 
 // Add the buffer to the PACK (array)
@@ -2244,10 +2313,9 @@ bool JsonTryParseValueAddToPack(PACK *p, JSON_VALUE *v, char *v_name, UINT index
 	{
 		if (v->type == JSON_TYPE_STRING)
 		{
-			UINT len = StrLen(v->value.string);
-			UCHAR *data = ZeroMalloc(len * 4 + 64);
-			UINT size = B64_Decode(data, v->value.string, len);
-			ElementNullSafe(PackAddDataEx(p, name, data, size, index, total))->JsonHint_IsArray = !is_single;
+			UINT data_size;
+			void *data = Base64ToBin(&data_size, v->value.string, StrLen(v->value.string));
+			ElementNullSafe(PackAddDataEx(p, name, data, data_size, index, total))->JsonHint_IsArray = !is_single;
 			Free(data);
 			ok = true;
 		}

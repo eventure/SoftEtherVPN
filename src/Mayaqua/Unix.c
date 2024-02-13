@@ -5,19 +5,51 @@
 // Unix.c
 // UNIX dependent code
 
-#include <GlobalConst.h>
+#ifdef	OS_UNIX
 
-#ifdef	UNIX
+#include "Unix.h"
 
+#include "Cfg.h"
+#include "FileIO.h"
+#include "GlobalConst.h"
+#include "Internat.h"
+#include "Kernel.h"
+#include "Mayaqua.h"
+#include "Memory.h"
+#include "Network.h"
+#include "Object.h"
+#include "Str.h"
+#include "Table.h"
+#include "Tick64.h"
+
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <wchar.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
+
+#include <dirent.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <pthread.h>
+#include <signal.h>
+
+#include <sys/mount.h>
+#include <sys/param.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
 #include <sys/utsname.h>
-#include <Mayaqua/Mayaqua.h>
+#include <sys/wait.h>
+
+#ifdef UNIX_LINUX
+#include <sys/statfs.h>
+#endif
+
+#ifdef UNIX_SOLARIS
+#define USE_STATVFS
+#include <sys/statvfs.h>
+#endif
 
 #ifdef	UNIX_MACOS
 #ifdef	NO_VLAN
@@ -212,9 +244,11 @@ OS_DISPATCH_TABLE *UnixGetDispatchTable()
 	return &t;
 }
 
-static void *signal_received_for_ignore(int sig, siginfo_t *info, void *ucontext) 
+static void signal_received_for_ignore(int sig, siginfo_t *info, void *ucontext)
 {
-	return NULL;
+	(void)sig;
+	(void)info;
+	(void)ucontext;
 }
 
 // Ignore the signal flew to the thread
@@ -224,7 +258,7 @@ void UnixIgnoreSignalForThread(int sig)
 
 	Zero(&sa, sizeof(sa));
 	sa.sa_handler = NULL;
-	sa.sa_sigaction = signal_received_for_ignore;
+	sa.sa_sigaction = &signal_received_for_ignore;
 	sa.sa_flags = SA_SIGINFO;
 
 	sigemptyset(&sa.sa_mask);
@@ -263,16 +297,25 @@ void UnixDisableInterfaceOffload(char *name)
 #endif	// UNIX_LINUX
 }
 
-// Validate whether the UNIX is running in a VM
+// Validate whether the Linux/FreeBSD is running in a VM
+// Not implemented yet on other OS
 bool UnixIsInVmMain()
 {
 	TOKEN_LIST *t = NULL;
 	bool ret = false;
+#if defined(UNIX_LINUX)
 	char *vm_str_list = "Hypervisor detected,VMware Virtual Platform,VMware Virtual USB,qemu,xen,paravirtualized,virtual hd,virtualhd,virtual pc,virtualpc,kvm,oracle vm,oraclevm,parallels,xvm,bochs";
+#elif defined(__FreeBSD__)
+	char *vm_str_list = "generic,xen,hv,vmware,kvm,bhyve";
+#endif
 
-#ifdef	UNIX_LINUX
+#if defined(UNIX_LINUX)
 	t = UnixExec("/bin/dmesg");
+#elif defined(__FreeBSD__)
+	t = UnixExec("/sbin/sysctl -n kern.vm_guest");
+#endif
 
+#if defined(UNIX_LINUX) || defined(__FreeBSD__)
 	if (t != NULL)
 	{
 		BUF *b = NewBuf();
@@ -295,10 +338,11 @@ bool UnixIsInVmMain()
 		FreeBuf(b);
 		FreeToken(t);
 	}
-#endif	// UNIX_LINUX
+#endif // defined(UNIX_LINUX) || defined(__FreeBSD)
 
 	return ret;
 }
+
 bool UnixIsInVm()
 {
 	static bool is_in_vm_flag = false;
@@ -799,7 +843,6 @@ void *UnixNewSingleInstance(char *instance_name)
 	if (fcntl(fd, F_SETLK, &lock) == -1)
 	{
 		close(fd);
-		(void)remove(name);
 		return NULL;
 	}
 	else
@@ -1838,9 +1881,18 @@ LOCK *UnixNewLock()
 	pthread_mutex_t *mutex;
 	// Memory allocation
 	LOCK *lock = UnixMemoryAlloc(sizeof(LOCK));
+	if (lock == NULL)
+	{
+		return NULL;
+	}
 
 	// Create a mutex
 	mutex = UnixMemoryAlloc(sizeof(pthread_mutex_t));
+	if (mutex == NULL)
+	{
+		UnixMemoryFree(lock);
+		return NULL;
+	}
 
 	// Initialization of the mutex
 	pthread_mutex_init(mutex, NULL);
@@ -1938,7 +1990,7 @@ void UnixGetSystemTime(SYSTEMTIME *system_time)
 
 	if (sizeof(time_t) == 4)
 	{
-		now2 = (time_64t)((UINT64)((UINT32)now));
+		now2 = (time_64t)((UINT64)((UINT)now));
 	}
 	else
 	{
@@ -1954,6 +2006,68 @@ void UnixGetSystemTime(SYSTEMTIME *system_time)
 	system_time->wMilliseconds = tv.tv_usec / 1000;
 
 	pthread_mutex_unlock(&get_time_lock);
+}
+
+UINT64 UnixGetHighresTickNano64(bool raw)
+{
+#if	defined(OS_WIN32) || defined(CLOCK_REALTIME) || defined(CLOCK_MONOTONIC) || defined(CLOCK_HIGHRES)
+	struct timespec t;
+	UINT64 ret;
+	static bool akirame = false;
+
+	if (akirame)
+	{
+		return UnixGetTick64() * 1000000ULL;
+	}
+
+	Zero(&t, sizeof(t));
+
+	if (raw == false)
+	{
+		// Function to get the boot time of the system
+		// Be careful. The Implementation is depend on the system.
+#ifdef	CLOCK_HIGHRES
+		clock_gettime(CLOCK_HIGHRES, &t);
+#else	// CLOCK_HIGHRES
+#ifdef	CLOCK_MONOTONIC
+		clock_gettime(CLOCK_MONOTONIC, &t);
+#else	// CLOCK_MONOTONIC
+		clock_gettime(CLOCK_REALTIME, &t);
+#endif	// CLOCK_MONOTONIC
+#endif	// CLOCK_HIGHRES
+	}
+	else
+	{
+		// Function to get the boot time of the system
+		// Be careful. The Implementation is depend on the system.
+#ifdef	CLOCK_HIGHRES
+		clock_gettime(CLOCK_HIGHRES, &t);
+#else	// CLOCK_HIGHRES
+#ifdef	CLOCK_MONOTONIC_RAW
+		clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+#else	// CLOCK_MONOTONIC_RAW
+#ifdef	CLOCK_MONOTONIC
+		clock_gettime(CLOCK_MONOTONIC, &t);
+#else	// CLOCK_MONOTONIC
+		clock_gettime(CLOCK_REALTIME, &t);
+#endif	// CLOCK_MONOTONIC
+#endif	// CLOCK_MONOTONIC_RAW
+#endif	// CLOCK_HIGHRES
+	}
+
+	ret = ((UINT64)((UINT)t.tv_sec)) * 1000000000LL + (UINT64)t.tv_nsec;
+
+	if (akirame == false && ret == 0)
+	{
+		ret = UnixGetTick64() * 1000000ULL;
+		akirame = true;
+	}
+
+	return ret;
+
+#else	
+	return UnixGetTick64() * 1000000ULL;
+#endif
 }
 
 // Get the system timer (64bit)
@@ -1976,7 +2090,7 @@ UINT64 UnixGetTick64()
 	clock_gettime(CLOCK_REALTIME, &t);
 #endif
 
-	ret = ((UINT64)((UINT32)t.tv_sec)) * 1000LL + (UINT64)t.tv_nsec / 1000000LL;
+	ret = ((UINT64)((UINT)t.tv_sec)) * 1000LL + (UINT64)t.tv_nsec / 1000000LL;
 
 	if (ret == 0)
 	{

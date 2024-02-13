@@ -5,18 +5,15 @@
 // Cfg.c
 // Configuration information manipulation module
 
-#include <GlobalConst.h>
+#include "Cfg.h"
 
-#define	CFG_C
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <wchar.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
-#include <Mayaqua/Mayaqua.h>
+#include "Encoding.h"
+#include "FileIO.h"
+#include "Internat.h"
+#include "Memory.h"
+#include "Network.h"
+#include "Object.h"
+#include "Str.h"
 
 // Create a backup of the configuration file
 void BackupCfgWEx(CFG_RW *rw, FOLDER *f, wchar_t *original, UINT revision_number)
@@ -750,12 +747,18 @@ bool CfgReadNextTextBUF(BUF *b, FOLDER *current)
 			if (!StrCmpi(token->Token[0], TAG_BYTE))
 			{
 				// byte
-				char *unescaped_b64 = CfgUnescape(data);
-				void *tmp = Malloc(StrLen(unescaped_b64) * 4 + 64);
-				int size = B64_Decode(tmp, unescaped_b64, StrLen(unescaped_b64));
-				CfgAddByte(current, name, tmp, size);
-				Free(tmp);
-				Free(unescaped_b64);
+				char *base64 = CfgUnescape(data);
+				const UINT base64_size = StrLen(base64);
+
+				UINT bin_size;
+				void *bin = Base64ToBin(&bin_size, base64, base64_size);
+				if (bin != NULL)
+				{
+					CfgAddByte(current, name, bin, bin_size);
+					Free(bin);
+				}
+
+				Free(base64);
 			}
 
 			Free(name);
@@ -1166,9 +1169,7 @@ void CfgAddItemText(BUF *b, ITEM *t, UINT depth)
 		break;
 
 	case ITEM_TYPE_BYTE:
-		data = ZeroMalloc(t->size * 4 + 32);
-		len = B64_Encode(data, t->Buf, t->size);
-		data[len] = 0;
+		data = Base64FromBin(NULL, t->Buf, t->size);
 		break;
 
 	case ITEM_TYPE_STRING:

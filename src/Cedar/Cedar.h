@@ -1,6 +1,6 @@
 // SoftEther VPN Source Code - Developer Edition Master Branch
 // Cedar Communication Module
-
+// © 2020 Nokia
 
 // Cedar.h
 // Header of Cedar.c
@@ -8,6 +8,10 @@
 #ifndef	CEDAR_H
 #define	CEDAR_H
 
+#include "CedarType.h"
+#include "GlobalConst.h"
+
+#include "Mayaqua/Network.h"
 
 //////////////////////////////////////////////////////////////////////
 // 
@@ -23,10 +27,6 @@
 #define	GetSecureRandomSize	__gsrs
 
 #endif	// VPN_SPEED
-
-#define	bool	UINT
-#define	BOOL	UINT
-
 
 // Version number
 #ifndef	CEDAR_VERSION_MAJOR
@@ -122,7 +122,6 @@
 #define	MAX_SESSION_NAME_LEN		255		// Session name maximum length
 #define	MAX_CONNECTION_NAME_LEN		255		// Maximum length of connection name
 #define	MAX_DEVICE_NAME_LEN			31		// Device name maximum length
-#define	MAX_DEVICE_NAME_LEN_9X		4		// Maximum length of Virtual LAN card name in Win9x
 #define	MAX_ACCESSLIST_NOTE_LEN		255		// Maximum length of the note of access list entry
 #define	MAX_SECURE_DEVICE_FILE_LEN	255		// Secure device file name maximum length
 #define	MAX_ADMIN_OPTION_NAME_LEN	63		// Management option name
@@ -367,6 +366,8 @@
 #define	AUTHTYPE_ROOTCERT				3			// Root certificate which is issued by trusted Certificate Authority
 #define	AUTHTYPE_RADIUS					4			// Radius authentication
 #define	AUTHTYPE_NT						5			// Windows NT authentication
+#define AUTHTYPE_EXTERNAL				96			// External authentication (completed)
+#define	AUTHTYPE_WIREGUARD_KEY			97			// WireGuard public key authentication
 #define	AUTHTYPE_OPENVPN_CERT    		98			// TLS client certificate authentication
 #define	AUTHTYPE_TICKET					99			// Ticket authentication
 
@@ -376,6 +377,7 @@
 #define	CLIENT_AUTHTYPE_PLAIN_PASSWORD	2			// Plain password authentication
 #define	CLIENT_AUTHTYPE_CERT			3			// Certificate authentication
 #define	CLIENT_AUTHTYPE_SECURE			4			// Secure device authentication
+#define	CLIENT_AUTHTYPE_OPENSSLENGINE			5			// Openssl engine authentication
 
 
 
@@ -674,6 +676,9 @@
 // 
 //////////////////////////////////////////////////////////////////////
 
+#define	UNIX_VLAN_CLIENT_IFACE_PREFIX		"vpn"			// Prefix of UNIX virtual LAN card interface (used for client)
+#define	UNIX_VLAN_BRIDGE_IFACE_PREFIX		"tap"			// Prefix of UNIX virtual LAN card interface (used for bridge destination)
+
 #ifndef	UNIX_BSD
 #define	TAP_FILENAME_1				"/dev/net/tun"
 #define	TAP_FILENAME_2				"/dev/tun"
@@ -868,6 +873,10 @@
 #define	ERR_VPNGATE_INCLIENT_CANT_STOP	146	// Can not be stopped if operating within VPN Client mode
 #define	ERR_NOT_SUPPORTED_FUNCTION_ON_OPENSOURCE	147	// It is a feature that is not supported in the open source version
 #define	ERR_SUSPENDING					148	// System is suspending
+#define ERR_HOSTNAME_MISMATCH			149	// SSL hostname mismatch
+#define ERR_SSL_PROTOCOL_VERSION		150 // SSL version not supported
+#define ERR_SSL_SHARED_CIPHER			151 // Can't find common cipher
+#define ERR_SSL_HANDSHAKE				152 // Other SSL handshake error
 
 
 ////////////////////////////
@@ -891,11 +900,11 @@ typedef struct TRAFFIC_ENTRY
 } TRAFFIC_ENTRY;
 
 // Traffic data
-typedef struct TRAFFIC
+struct TRAFFIC
 {
 	TRAFFIC_ENTRY Send;				// Transmitted data
 	TRAFFIC_ENTRY Recv;				// Received data
-} TRAFFIC;
+};
 
 // Non-SSL connection source
 typedef struct NON_SSL
@@ -914,7 +923,7 @@ typedef struct TINY_LOG
 } TINY_LOG;
 
 // CEDAR structure
-typedef struct CEDAR
+struct CEDAR
 {
 	LOCK *lock;						// Lock
 	REF *ref;						// Reference counter
@@ -922,12 +931,14 @@ typedef struct CEDAR
 	UINT Type;						// Type
 	LIST *ListenerList;				// Listener list
 	LIST *HubList;					// HUB list
+	LIST *WgkList;					// WireGuard key list
 	LIST *ConnectionList;			// Negotiating connection list
 	LIST *CaList;					// List of CA
 	volatile bool Halt;				// Halt flag
 	COUNTER *ConnectionIncrement;	// Connection increment counter
 	X *ServerX;						// Server certificate
 	K *ServerK;						// Private key of the server certificate
+	LIST *ServerChain;				// Server trust chain
 	char UsernameHubSeparator;		// Character which separates the username from the hub name
 	char *CipherList;				// List of encryption algorithms
 	UINT Version;					// Version information
@@ -981,142 +992,13 @@ typedef struct CEDAR
 	UINT FifoBudget;				// Fifo budget
 	SSL_ACCEPT_SETTINGS SslAcceptSettings;	// SSL Accept Settings
 	UINT DhParamBits;  // Bits of Diffie-Hellman parameters
-	char OpenVPNDefaultClientOption[MAX_SIZE];	// OpenVPN: Default Client Option String
-	bool OpenVPNObfuscation;					// OpenVPN: Obfuscation mode
-	char OpenVPNObfuscationMask[MAX_SIZE];		// OpenVPN: String (mask) for XOR obfuscation
-	bool OpenVPNPushDummyIPv4AddressOnL2Mode;	// OpenVPN: Push a dummy IPv4 address on L2 mode
-} CEDAR;
+};
 
 // Type of CEDAR
 #define	CEDAR_CLIENT				0	// Client
 #define	CEDAR_STANDALONE_SERVER		1	// Stand-alone server
 #define	CEDAR_FARM_CONTROLLER		2	// Server farm controller
 #define	CEDAR_FARM_MEMBER			3	// Server farm member
-
-
-////////////////////////////
-// Read the header file
-
-// Type
-#include <Cedar/CedarType.h>
-// Account Manager
-#include <Cedar/Account.h>
-// Listener module
-#include <Cedar/Listener.h>
-// Log storage module
-#include <Cedar/Logging.h>
-// Connection management
-#include <Cedar/Connection.h>
-// Session Management
-#include <Cedar/Session.h>
-// RPC
-#include <Cedar/Remote.h>
-// HUB management
-#include <Cedar/Hub.h>
-// Security Accounts Manager
-#include <Cedar/Sam.h>
-// Radius authentication module
-#include <Cedar/Radius.h>
-// Native protocol
-#include <Cedar/Protocol.h>
-// Inter-HUB link
-#include <Cedar/Link.h>
-// User-mode virtual host
-#include <Cedar/Virtual.h>
-// SecureNAT
-#include <Cedar/SecureNAT.h>
-// Digital watermark
-#include <Cedar/WaterMark.h>
-// Secure data
-#include <Cedar/SecureInfo.h>
-// Console service
-#include <Cedar/Console.h>
-// Vpncmd utility
-#include <Cedar/Command.h>
-// RPC over HTTP
-#include <Cedar/Wpc.h>
-// Layer-2/Layer-3 converter
-#include <Cedar/IPC.h>
-// Third party protocols
-#include <Cedar/Proto.h>
-#include <Cedar/Proto_IPsec.h>
-#include <Cedar/Proto_EtherIP.h>
-#include <Cedar/Proto_IkePacket.h>
-#include <Cedar/Proto_IKE.h>
-#include <Cedar/Proto_L2TP.h>
-#include <Cedar/Proto_OpenVPN.h>
-#include <Cedar/Proto_PPP.h>
-#include <Cedar/Proto_SSTP.h>
-#include <Cedar/Proto_Win7.h>
-// UDP Acceleration
-#include <Cedar/UdpAccel.h>
-// DDNS Client
-#include <Cedar/DDNS.h>
-// VPN Azure Client
-#include <Cedar/AzureClient.h>
-// VPN Azure Server
-#include <Cedar/AzureServer.h>
-// Native IP Stack
-#include <Cedar/NativeStack.h>
-
-#ifdef	OS_WIN32
-// Neo device driver
-#include <Neo/Neo.h>
-// SeLow User-mode
-#include <Cedar/SeLowUser.h>
-#endif	// OS_WIN32
-
-// Neo device driver manipulation library
-#include <Cedar/VLan.h>
-// Bridge
-#include <Cedar/Bridge.h>
-// Layer-3 switch
-#include <Cedar/Layer3.h>
-// Virtual LAN card for test
-#include <Cedar/NullLan.h>
-// Client
-#include <Cedar/Client.h>
-// Server
-#include <Cedar/Server.h>
-// License database
-#include <Cedar/Database.h>
-// EtherLogger
-#include <Cedar/EtherLog.h>
-// Management RPC
-#include <Cedar/Admin.h>
-// User-mode Router
-#include <Cedar/Nat.h>
-
-// Web UI
-#include <Cedar/WebUI.h>
-
-// VPN Gate Main Implementation
-#include <Cedar/VG.h>
-
-
-#ifdef	OS_WIN32
-
-// Win32 user interface
-#include <Cedar/WinUi.h>
-// Win32 Client Connection Manager
-#include <Cedar/CM.h>
-// Win32 Server Manager
-#include <Cedar/SM.h>
-// Win32 User-mode Router Manager
-#include <Cedar/NM.h>
-// Win32 EtherLogger Manager
-#include <Cedar/EM.h>
-// Win32 Network Utility
-#include <Cedar/UT.h>
-// Win32 Setup Wizard
-#include <Cedar/SW.h>
-// Win32 COM calling module
-#include <Cedar/Win32Com.h>
-
-#endif
-
-
-
 
 ////////////////////////////
 // Function prototype
@@ -1127,6 +1009,7 @@ CEDAR *NewCedar(X *server_x, K *server_k);
 void CedarForceLink();
 void SetCedarVpnBridge(CEDAR *c);
 void SetCedarCert(CEDAR *c, X *server_x, K *server_k);
+void SetCedarCertAndChain(CEDAR *c, X *server_x, K *server_k, LIST *server_chain);
 void ReleaseCedar(CEDAR *c);
 void CleanupCedar(CEDAR *c);
 void StopCedar(CEDAR *c);
@@ -1139,6 +1022,7 @@ void DelHubEx(CEDAR *c, HUB *h, bool no_lock);
 void StopAllHub(CEDAR *c);
 void StopAllConnection(CEDAR *c);
 void AddConnection(CEDAR *cedar, CONNECTION *c);
+UINT GetUnestablishedConnections(CEDAR *cedar);
 void DelConnection(CEDAR *cedar, CONNECTION *c);
 void SetCedarCipherList(CEDAR *cedar, char *name);
 void InitCedar();
@@ -1163,6 +1047,7 @@ bool AddNoSsl(CEDAR *c, IP *ip);
 void DecrementNoSsl(CEDAR *c, IP *ip, UINT num_dec);
 void DeleteOldNoSsl(CEDAR *c);
 NON_SSL *SearchNoSslList(CEDAR *c, IP *ip);
+bool IsInNoSsl(CEDAR *c, IP *ip);
 void FreeTinyLog(TINY_LOG *t);
 void WriteTinyLog(TINY_LOG *t, char *str);
 TINY_LOG *NewTinyLog();

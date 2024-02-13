@@ -8,6 +8,7 @@
 #ifndef	SESSION_H
 #define	SESSION_H
 
+#include "Cedar.h"
 
 // Interval to increment the number of logins after the connection
 #define	NUM_LOGIN_INCREMENT_INTERVAL		(30 * 1000)
@@ -90,6 +91,7 @@ struct SESSION
 	char ClientIP[64];				// Client IP
 	CLIENT_OPTION *ClientOption;	// Client connection options
 	CLIENT_AUTH *ClientAuth;		// Client authentication data
+	SSL_VERIFY_OPTION *SslOption;	// SSL verification option
 	volatile bool Halt;				// Halting flag
 	volatile bool CancelConnect;	// Cancel the connection
 	EVENT *HaltEvent;				// Halting event
@@ -128,6 +130,7 @@ struct SESSION
 	UCHAR Padding[2];
 
 	IP ServerIP_CacheForNextConnect;	// Server IP, cached for next connect
+	IP LocalIP_CacheForNextConnect;		// Local  IP, cached for next connect (2nd and subsequent), assigned by first outgoing connection
 
 	UINT64 CreatedTime;				// Creation date and time
 	UINT64 LastCommTime;			// Last communication date and time
@@ -226,8 +229,6 @@ struct SESSION
 	UINT64 LastDLinkSTPPacketSendTick;	// Last D-Link STP packet transmission time
 	UCHAR LastDLinkSTPPacketDataHash[MD5_SIZE];	// Last D-Link STP packet hash
 
-	bool *NicDownOnDisconnect;		// Pointer to client configuration parameter. NULL for non-clients.
-
 	SHARED_BUFFER *IpcSessionSharedBuffer;	// A shared buffer between IPC and Session
 	IPC_SESSION_SHARED_BUFFER_DATA *IpcSessionShared;	// Shared data between IPC and Session
 };
@@ -305,8 +306,8 @@ struct UI_CHECKCERT
 
 
 // Function prototype
-SESSION *NewClientSessionEx(CEDAR *cedar, CLIENT_OPTION *option, CLIENT_AUTH *auth, PACKET_ADAPTER *pa, struct ACCOUNT *account, bool *NicDownOnDisconnect);
-SESSION *NewClientSession(CEDAR *cedar, CLIENT_OPTION *option, CLIENT_AUTH *auth, PACKET_ADAPTER *pa, bool *NicDownOnDisconnect);
+SESSION *NewClientSessionEx(CEDAR *cedar, CLIENT_OPTION *option, CLIENT_AUTH *auth, PACKET_ADAPTER *pa, struct ACCOUNT *account);
+SESSION *NewClientSession(CEDAR *cedar, CLIENT_OPTION *option, CLIENT_AUTH *auth, PACKET_ADAPTER *pa);
 SESSION *NewRpcSession(CEDAR *cedar, CLIENT_OPTION *option);
 SESSION *NewRpcSessionEx(CEDAR *cedar, CLIENT_OPTION *option, UINT *err, char *client_str);
 SESSION *NewRpcSessionEx2(CEDAR *cedar, CLIENT_OPTION *option, UINT *err, char *client_str, void *hWnd);
@@ -340,6 +341,9 @@ void AddCancelList(LIST *o, CANCEL *c);
 void CancelList(LIST *o);
 bool IsPriorityHighestPacketForQoS(void *data, UINT size);
 UINT GetNextDelayedPacketTickDiff(SESSION *s);
+
+UINT PrepareDHCPRequestForStaticIPv4(SESSION *s, BLOCK *b);
+void ClearDHCPLeaseRecordForIPv4(SESSION *s, UINT static_ip);
 
 #endif	// SESSION_H
 

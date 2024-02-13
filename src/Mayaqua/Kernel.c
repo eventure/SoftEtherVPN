@@ -5,16 +5,27 @@
 // Kernel.c
 // System service processing routine
 
-#include <GlobalConst.h>
+#include "Kernel.h"
 
-#include <stdio.h>
+#include "Encrypt.h"
+#include "Internat.h"
+#include "Mayaqua.h"
+#include "Memory.h"
+#include "Microsoft.h"
+#include "Object.h"
+#include "Str.h"
+#include "Table.h"
+#include "Tracking.h"
+#include "Unix.h"
+#include "Win32.h"
+
 #include <stdlib.h>
 #include <string.h>
-#include <wchar.h>
-#include <stdarg.h>
 #include <time.h>
-#include <errno.h>
-#include <Mayaqua/Mayaqua.h>
+
+#ifdef OS_UNIX
+#include <sys/time.h>
+#endif
 
 #ifndef TM_YEAR_MAX
 #define TM_YEAR_MAX         2106
@@ -220,7 +231,7 @@ UINT64 TickGetRealtimeTickValue64()
 	}
 	else
 	{
-		ret = (UINT64)((UINT64)((UINT32)tv.tv_sec)) * 1000ULL + (UINT64)tv.tv_usec / 1000ULL;
+		ret = (UINT64)((UINT64)((UINT)tv.tv_sec)) * 1000ULL + (UINT64)tv.tv_usec / 1000ULL;
 	}
 
 	return ret;
@@ -612,15 +623,8 @@ void HashInstanceName(char *name, UINT size, char *instance_name)
 
 	Format(name, size, "VPN-%s", key);
 
-	if (OS_IS_WINDOWS_NT(GetOsInfo()->OsType))
-	{
-		if (GET_KETA(GetOsInfo()->OsType, 100) >= 2 ||
-			GetOsInfo()->OsType == OSTYPE_WINDOWS_NT_4_TERMINAL_SERVER)
-		{
-			StrCpy(tmp, sizeof(tmp), name);
-			Format(name, size, "Global\\%s", tmp);
-		}
-	}
+	StrCpy(tmp, sizeof(tmp), name);
+	Format(name, size, "Global\\%s", tmp);
 }
 void HashInstanceNameLocal(char *name, UINT size, char *instance_name)
 {
@@ -643,15 +647,8 @@ void HashInstanceNameLocal(char *name, UINT size, char *instance_name)
 
 	Format(name, size, "VPN-%s", key);
 
-	if (OS_IS_WINDOWS_NT(GetOsInfo()->OsType))
-	{
-		if (GET_KETA(GetOsInfo()->OsType, 100) >= 2 ||
-			GetOsInfo()->OsType == OSTYPE_WINDOWS_NT_4_TERMINAL_SERVER)
-		{
-			StrCpy(tmp, sizeof(tmp), name);
-			Format(name, size, "Local\\%s", tmp);
-		}
-	}
+	StrCpy(tmp, sizeof(tmp), name);
+	Format(name, size, "Local\\%s", tmp);
 }
 
 // Run the process
@@ -1903,7 +1900,7 @@ void UINT64ToSystem(SYSTEMTIME *st, UINT64 sec64)
 	sec = (UINT)tmp64;
 	time = (time_64t)sec;
 	TimeToSystem(st, time);
-	st->wMilliseconds = (WORD)millisec;
+	st->wMilliseconds = (USHORT)millisec;
 }
 
 // Convert the SYSTEMTIME to UINT64
@@ -2103,7 +2100,31 @@ void AbortExitEx(char *msg)
 	f = fopen("abort_error_log.txt", "w");
 	if (f != NULL)
 	{
+		SYSTEMTIME time = { 0 };
+		char time_str[128] = { 0 };
+		char *crlf = "\r\n";
+		char *tag = "---------";
+
+		LocalTime(&time);
+
+		sprintf(time_str, "%04u-%02u-%02u %02u:%02u:%02u",
+			time.wYear, time.wMonth, time.wDay,
+			time.wHour, time.wMinute, time.wSecond);
+
+		fwrite(tag, 1, strlen(tag), f);
+
+		fwrite(crlf, 1, strlen(crlf), f);
+
+		fwrite(time_str, 1, strlen(time_str), f);
+
+		fwrite(crlf, 1, strlen(crlf), f);
+
 		fwrite(msg, 1, strlen(msg), f);
+
+		fwrite(crlf, 1, strlen(crlf), f);
+
+		fwrite(crlf, 1, strlen(crlf), f);
+
 		fclose(f);
 	}
 
